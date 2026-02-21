@@ -1,4 +1,4 @@
-"use strict";
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { Coffee, Trash2, Edit2, Plus, Minus } from 'lucide-react';
