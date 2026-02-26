@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MailMood - Emotional Intelligence for Gmail</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f9fafb;
+        }
+        
+        header {
+            background: white;
+            padding: 20px 0;
+            border-bottom: 1px solid #e5e7eb;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        
+        .nav a {
+            color: #6b7280;
+            text-decoration: none;
+            margin-left: 30px;
+            font-size: 14px;
+        }
+        
+        .nav a:hover {
+            color: #1f2937;
+        }
+        
+        .hero {
+            background: white;
+            padding: 80px 20px;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #1f2937;
+        }
+        
+        .hero p {
+            font-size: 20px;
+            color: #6b7280;
+            margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: #2563eb;
+            color: white;
+            padding: 14px 40px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        .cta-button:hover {
+            background: #1d4ed8;
+        }
+        
+        .features {
+            padding: 80px 20px;
+            background: #f9fafb;
+        }
+        
+        .features h2 {
+            text-align: center;
+            font-size: 36px;
+            margin-bottom: 60px;
+            color: #1f2937;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 40px;
+        }
+        
+        .feature {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .feature h3 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #1f2937;
+        }
+        
+        .feature p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .privacy {
+            padding: 60px 20px;
+            background: white;
+            text-align: center;
+        }
+        
+        .privacy h3 {
+            color: #1f2937;
+            margin-bottom: 15px;
+        }
+        
+        .privacy p {
+            color: #6b7280;
+            font-size: 14px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        footer {
+            background: #1f2937;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        footer a {
+            color: #93c5fd;
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">MailMood</div>
+            <nav class="nav">
+                <a href="#features">Features</a>
+                <a href="https://github.com/campbellca2-a11y/MailMood" target="_blank">GitHub</a>
+            </nav>
+        </div>
+    </header>
+    
+    <section class="hero">
+        <div class="container">
+            <h1>See How Emails Feel</h1>
+            <p>Understand the emotional tone of every message at a glance. MailMood adds mood badges to your Gmail inbox — processed locally, zero data retention.</p>
+            <a href="https://chrome.google.com/webstore/detail/mailmood/gpljemnighedjmmeglmogpclaafgnokg" target="_blank" class="cta-button">Get MailMood Free</a>
+        </div>
+    </section>
+    
+    <section class="features" id="features">
+        <div class="container">
+            <h2>How It Works</h2>
+            <div class="feature-grid">
+                <div class="feature">
+                    <h3>📧 Inbox Mood Badges</h3>
+                    <p>Color-coded emotion indicators next to each email subject. Hover to see confidence levels and analysis.</p>
+                </div>
+                <div class="feature">
+                    <h3>✏️ Compose Intelligence</h3>
+                    <p>Real-time tone detection as you write. Catch unintended aggression or sadness before hitting send.</p>
+                </div>
+                <div class="feature">
+                    <h3>🔄 One-Click Rewrite</h3>
+                    <p>Adjust email tone with a single click. Change urgent to calm, apologetic to confident.</p>
+                </div>
+                <div class="feature">
+                    <h3>🔒 100% Private</h3>
+                    <p>All analysis happens locally. Your emails never leave your computer. Zero tracking, zero data retention.</p>
+                </div>
+                <div class="feature">
+                    <h3>⚡ Six Emotional Tones</h3>
+                    <p>Calm/Professional • Warm/Positive • Urgent/Tense • Apologetic/Anxious • Neutral/Automated • Sad/Concerned</p>
+                </div>
+                <div class="feature">
+                    <h3>🎯 For Everyone</h3>
+                    <p>Better communication is better for everyone — at work, with family, with friends.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="privacy">
+        <div class="container">
+            <h3>Your Privacy Matters</h3>
+            <p>MailMood is designed with privacy-first architecture. Email text is analyzed locally on your device and never stored or transmitted. We have no access to your emails, ever.</p>
+        </div>
+    </section>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 Bill Campbell. <a href="https://github.com/campbellca2-a11y/MailMood" target="_blank">Open Source</a> • <a href="https://github.com/campbellca2-a11y/MailMood/blob/main/LICENSE" target="_blank">License</a> • <a href="https://github.com/campbellca2-a11y/MailMood/blob/main/SECURITY.md" target="_blank">Security</a></p>
+        </div>
+    </footer>
+</body>
+</html>
