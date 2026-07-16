@@ -1,0 +1,56 @@
+Memory updated
+Thought for a couple of seconds
+
+Yes. Correct correction.
+
+I jumped to the fun bird layer too fast.
+
+The actual stack is:
+
+1. Sunrise
+
+First object. First layer. First proof.
+
+Watch sunrise traverse the globe.
+
+No birds yet. No biome logic. No sound layer. No clever add-ons.
+
+Just:
+
+Earth turns.
+Light arrives.
+Morning moves.
+
+That is the base visualizer.
+
+2. Birds
+
+Second layer.
+
+Light arrives first.
+Then the world does sound check.
+
+So the product order is:
+
+Stage	Layer	What it proves
+1	Sunrise	The sphere can show a planetary wave cleanly
+2	Birds	A life/noise layer can ride on top of the light wave
+3	Other layers	Storms, aurora, tides, migration, city lights, etc.
+
+The anchor phrase is excellent:
+
+Lights first. Then the sound check.
+
+That’s the build order and the metaphor.
+
+The first app is not BirdsAroundTheGlobe.
+
+The first app is more like:
+
+Sunrise Around the Globe
+or
+Dawnline
+
+Then BirdsAroundTheGlobe becomes Pack #2, not the foundation.
+
+Much cleaner.

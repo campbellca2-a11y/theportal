@@ -1,0 +1,386 @@
+You are reviewing a working prototype called **Dawnline**.
+
+You have been given:
+
+1. The current Dawnline v3 build and its source files.
+2. Earlier Dawnline versions if available.
+3. The original product concept and build sequence below.
+4. A prior technical review identifying strengths, defects, and possible next steps.
+
+Your job is to independently validate the reasoning, inspect the actual implementation, and recommend the correct next move.
+
+Do not flatter the project.
+Do not assume prior conclusions are correct.
+Do not invent missing functionality.
+Do not judge only from screenshots or filenames.
+Inspect the actual code, structure, runtime behavior, dependencies, and default presentation.
+
+## Original product concept
+
+Dawnline begins with one object and one proof:
+
+### Stage 1: Sunrise
+
+Watch sunrise traverse the globe.
+
+No birds yet.
+No biome logic.
+No sound layer.
+No clever add-ons.
+
+Just:
+
+**Earth turns.
+Light arrives.
+Morning moves.**
+
+This is the foundational planetary visualizer.
+
+### Stage 2: Birds
+
+After the sunrise layer works cleanly:
+
+**Light arrives first.
+Then the world does sound check.**
+
+Bird activity and sound become a second layer that responds to the arrival of morning.
+
+### Stage 3: Other layers
+
+Only after the foundation is proven may other layers be considered, such as:
+
+* Storms
+* Aurora
+* Tides
+* Migration
+* Clouds
+* City lights
+* Human activity
+* Other geographically or temporally driven phenomena
+
+The intended build order is:
+
+| Stage | Layer        | Purpose                                                               |
+| ----- | ------------ | --------------------------------------------------------------------- |
+| 1     | Sunrise      | Prove that a planetary wave can be displayed clearly                  |
+| 2     | Birds        | Prove that a biological and sound layer can respond to the light wave |
+| 3     | Other layers | Extend the same foundation deliberately                               |
+
+Anchor phrase:
+
+**Lights first. Then the sound check.**
+
+“Lights” here primarily means sunlight and the arrival of morning—not city-light decoration.
+
+## Current working conclusion to validate
+
+The current hypothesis is:
+
+* Dawnline v3 contains a legitimate and reusable foundation.
+* Its core time, solar-position, globe, shader, and dawn-transition mechanisms are worth preserving.
+* It should not be abandoned.
+* It should not yet be treated as the final Stage 1 presentation.
+* The default visual currently includes more than the original concept requires.
+* Sunrise should become the unquestioned primary object.
+* Clouds, city lights, stars, labels, inspection data, and similar elements should be optional rather than conceptually fused into the foundation.
+* Development controls may remain available without being part of the ambient default experience.
+* The next pass should refine and simplify the existing build rather than restart from zero.
+
+You must test this conclusion rather than merely repeat it.
+
+# Review tasks
+
+## 1. Determine what Dawnline v3 actually is
+
+Classify it as one of the following:
+
+* A viable reusable foundation
+* A partially reusable prototype requiring structural work
+* A visually impressive but fragile one-off
+* A dead-end implementation that should be abandoned
+
+Give a decisive answer and support it with code-level evidence.
+
+Evaluate:
+
+* Time-state architecture
+* Solar-position calculations
+* Globe orientation
+* Dawn and twilight rendering
+* Shader structure
+* Layer independence
+* Asset and dependency handling
+* Offline reliability
+* Error handling
+* Performance
+* Maintainability
+* Extensibility
+* Whether future bird and sound layers can consume the existing sunrise state cleanly
+
+## 2. Compare the build against the original concept
+
+Create a table with these columns:
+
+| Original requirement | Current implementation | Aligned / Partial / Misaligned | Evidence | Required correction |
+
+At minimum, evaluate:
+
+* Sunrise is the first object
+* Earth turns
+* Light arrives
+* Morning moves
+* No birds yet
+* No sound yet
+* No biome logic yet
+* No city dashboard
+* No feature creep in the default experience
+* Sunrise clearly reads as a planetary wave
+* The build can operate as a clean ambient clock
+* Later layers can be added without rewriting the foundation
+* The clock and development tools do not visually overwhelm the sunrise experience
+
+Distinguish between:
+
+* Core engine behavior
+* Development and diagnostic controls
+* Default visible presentation
+* Optional enhancement layers
+* Future product layers
+
+Do not treat every control or debugging tool as a conceptual violation. Judge whether it intrudes on the default product experience.
+
+## 3. Validate the central technical mechanism
+
+Confirm whether the implementation follows a legitimate chain such as:
+
+Time
+→ solar position
+→ sunlight state across Earth
+→ dawn and twilight boundary
+→ visible moving morning wave
+→ optional future layers responding to the same state
+
+Identify any place where the visual is merely decorative rather than derived from the actual solar state.
+
+Specifically determine:
+
+* Whether dawn progresses geographically and temporally in a physically coherent way
+* Whether the Sun direction and globe coordinates agree
+* Whether the implementation merely rotates textures to simulate sunrise
+* Whether accelerated time and date selection remain coherent
+* Whether the same state could later trigger bird activity by location and solar-altitude threshold
+
+## 4. Judge the current default visual
+
+Evaluate whether the default scene preserves the original restraint:
+
+**Earth turns. Light arrives. Morning moves.**
+
+Review the role of:
+
+* Day texture
+* Night texture
+* City lights
+* Clouds
+* Atmosphere
+* Stars
+* Twilight bands
+* Labels
+* Clock display
+* Date display
+* Solar data
+* Click inspection
+* Playback controls
+* Automatic decorative rotation
+
+For every element, classify it as:
+
+* Required for Dawnline Core
+* Useful for Dawnline Clock
+* Optional enhancement
+* Development tool
+* Future layer
+* Remove entirely
+
+Be especially critical of elements that are visually attractive but weaken the clarity of sunrise as the primary object.
+
+## 5. Decide whether to preserve, modify, or rebuild
+
+Give one recommendation:
+
+### A. Preserve and refine
+
+Use when the architecture is fundamentally sound and the work is mainly cleanup, simplification, and modularization.
+
+### B. Extract and rebuild around the core
+
+Use when the core mechanism is valuable but the current structure or interface is too tangled to continue safely.
+
+### C. Abandon
+
+Use only if the implementation cannot realistically support the intended product without disproportionate rework.
+
+Explain why the chosen option is better than the other two.
+
+## 6. Propose the correct next version
+
+Define a narrow specification for the next build, tentatively called:
+
+**Dawnline v3.1 — Sunrise Foundation**
+
+Its purpose is not to add features. Its purpose is to establish the clean first layer.
+
+The recommended default experience should be tested against this candidate:
+
+* Earth surface
+* Night and daylight states
+* Astronomical, nautical, and civil twilight where visually useful
+* Subtle atmosphere
+* Current time
+* Correct live sunrise movement
+* Stable camera position
+* No city dashboard
+* No bird layer
+* No sound layer
+* No migration or biome logic
+* No visible labels unless requested
+* No cloud layer by default
+* No city lights by default
+* No decorative globe rotation by default
+* Controls hidden until opened
+* Optional inspection and time-travel tools remain available
+* All nonessential layers independently switchable
+* Offline-capable
+* Clear visible startup errors
+* No remote runtime dependency
+
+Do not accept this specification automatically. Correct it where necessary.
+
+## 7. Define the layer architecture
+
+Propose a simple conceptual architecture such as:
+
+### Dawnline Core
+
+* Time state
+* Solar calculations
+* Earth coordinates
+* Day/night/dawn rendering
+* Camera and rendering loop
+
+### Dawnline Clock
+
+* Local time
+* UTC
+* Date
+* Pause
+* Speed
+* Scrubbing
+* Fullscreen
+* Minimal ambient display
+
+### Optional visual enhancements
+
+* Stars
+* Clouds
+* Night lights
+* Labels
+* Inspection overlays
+
+### Future Pack 2: Birds
+
+* Geographic bird profiles
+* Local solar-altitude thresholds
+* Activity intensity
+* Audio playback
+* Fade-in and fade-out behavior
+* Seasonal or biome information only after the basic trigger works
+
+Determine whether this separation fits the existing code or requires significant restructuring.
+
+## 8. Produce an implementation plan
+
+Return a prioritized sequence with three levels.
+
+### Critical before further design
+
+Problems that threaten correctness, reliability, or maintainability.
+
+### Required for Sunrise Foundation
+
+Changes needed to make Stage 1 faithful to the original product concept.
+
+### Deferred
+
+Ideas that should not be added yet, even if they are attractive.
+
+For each recommended change include:
+
+* What changes
+* Why it changes
+* Which file or subsystem is affected
+* Risk level
+* How to verify it
+* Whether it preserves or alters the current visual
+
+## 9. Define acceptance tests
+
+Create concrete pass/fail tests for Dawnline v3.1.
+
+Include tests for:
+
+* Offline startup
+* Visible startup failures
+* Correct current date and time
+* Midnight rollover
+* Time scrubber synchronization
+* Pause and resume
+* Accelerated time
+* Date changes
+* Equinox behavior
+* Solstice behavior
+* Sunrise crossing a selected location
+* Dawnline continuity across the globe
+* Camera stability
+* Layer switches
+* Fullscreen ambient mode
+* CPU and rendering behavior
+* No city dashboard
+* No sound
+* No birds
+* No hidden remote dependencies
+* Default presentation clearly showing sunrise as the primary event
+
+Also define one simple human test:
+
+> Can a person view Dawnline for ten seconds and understand that morning is moving across Earth without first reading instructions?
+
+## Required output format
+
+Return the review in this order:
+
+1. **Executive verdict**
+2. **Keep, extract, or abandon**
+3. **Alignment table**
+4. **Technical foundation assessment**
+5. **Default visual assessment**
+6. **Problems and risks**
+7. **Recommended Dawnline v3.1 specification**
+8. **Prioritized implementation plan**
+9. **Acceptance tests**
+10. **Deferred ideas**
+11. **Final decision in one paragraph**
+
+Be specific enough to be proven wrong.
+
+Do not write replacement code unless a small excerpt is necessary to demonstrate a problem.
+
+Do not propose birds, sound, weather, or other expansion work until the Sunrise Foundation passes its acceptance tests.
+
+The decision standard is not:
+
+“Is this impressive?”
+
+The decision standard is:
+
+**“Does this provide a clean, correct, maintainable first layer upon which the intended Dawnline system can be built?”**

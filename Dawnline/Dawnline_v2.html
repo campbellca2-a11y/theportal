@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Dawnline II — Sunrise Around the Globe</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root {
+    --ink: #e9eef7;
+    --dim: #8a93a6;
+    --line: rgba(255,255,255,0.10);
+    --panel: rgba(10,14,22,0.60);
+    --accent: #ffb86b;
+    --dawn: #ff9a55;
+  }
+  html,body { margin:0; height:100%; background:#03050a; color:var(--ink);
+    font: 14px/1.4 -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    overflow:hidden; }
+  #stage { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  /* subtle vignette to sell the "sphere in a dark room" feel */
+  #vignette {
+    position:fixed; inset:0; pointer-events:none;
+    background: radial-gradient(ellipse at center,
+      rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 100%);
+  }
+
+  .panel {
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; backdrop-filter: blur(10px);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+
+  .hud {
+    position:fixed; left:16px; top:16px; padding:14px 16px;
+    min-width: 280px; max-width: 320px;
+  }
+  .hud h1 { margin:0; font-size:20px; letter-spacing:0.5px; }
+  .hud .tag { color:var(--accent); font-size:11px; letter-spacing:2px; text-transform:uppercase; }
+  .hud .sub { color:var(--dim); font-size:12px; margin: 4px 0 10px; font-style:italic; }
+  .readout { font-variant-numeric: tabular-nums; font-size:13px; line-height:1.7; }
+  .readout b { color:var(--accent); font-weight:600; }
+  .readout .small { color:var(--dim); font-size:11px; }
+
+  .cities {
+    position:fixed; right:16px; top:16px; padding:12px 14px;
+    min-width: 240px; max-width: 280px;
+  }
+  .cities h2 {
+    margin:0 0 8px; font-size:12px; letter-spacing:2px;
+    text-transform:uppercase; color:var(--dawn);
+  }
+  .cities ul { list-style:none; margin:0; padding:0; max-height: 300px; overflow:auto; }
+  .cities li {
+    display:flex; justify-content:space-between; gap:8px;
+    padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,0.06);
+    font-size:12px;
+  }
+  .cities li:last-child { border-bottom: none; }
+  .cities .alt { color:var(--dim); font-variant-numeric: tabular-nums; font-size:11px; }
+  .cities .phase { color:var(--dawn); font-size:10px; letter-spacing:1px; }
+  .cities .empty { color:var(--dim); font-size:11px; font-style:italic; padding: 6px 0; }
+
+  .controls {
+    position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
+    padding:10px 14px;
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    max-width: 95vw;
+  }
+  .controls button {
+    background:#141a26; color:var(--ink); border:1px solid var(--line);
+    padding:6px 10px; border-radius:8px; cursor:pointer; font-size:12px;
+    transition: all 0.15s;
+  }
+  .controls button.active { border-color:var(--accent); color:var(--accent);
+                            box-shadow: 0 0 12px rgba(255,184,107,0.25); }
+  .controls button:hover { background:#1c2434; }
+  .controls input[type=range] { width:220px; accent-color: var(--accent); }
+  .controls input[type=date] {
+    background:#141a26; color:var(--ink); border:1px solid var(--line);
+    padding:5px 8px; border-radius:8px; font-size:12px;
+    color-scheme: dark;
+  }
+  .controls .lbl { color:var(--dim); font-size:11px; letter-spacing:1px;
+                   text-transform:uppercase; }
+  .controls .group {
+    display:flex; align-items:center; gap:8px;
+    padding: 0 8px; border-right: 1px solid var(--line);
+  }
+  .controls .group:last-child { border-right: none; }
+
+  .hint {
+    position:fixed; left:16px; bottom:18px; padding:8px 12px;
+    color:var(--dim); font-size:11px; max-width:200px;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; backdrop-filter: blur(6px);
+  }
+  .hint b { color:var(--ink); }
+
+  .tip {
+    position:fixed; padding: 8px 10px; pointer-events:none;
+    font-size:11px; line-height:1.5;
+    background: rgba(5,8,14,0.92); border:1px solid var(--accent);
+    border-radius:8px; z-index: 100;
+    box-shadow: 0 4px 20px rgba(255,184,107,0.15);
+  }
+  .tip b { color:var(--accent); }
+  .tip .phase { color:var(--dawn); font-size:10px; letter-spacing:1px; text-transform:uppercase; }
+
+  .loading {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:#03050a; color:var(--dim); font-size:13px;
+    z-index: 200; transition: opacity 0.6s;
+  }
+  .loading.hide { opacity:0; pointer-events:none; }
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading">loading Earth textures…</div>
+<div id="stage"></div>
+<div id="vignette"></div>
+
+<div class="hud panel">
+  <div class="tag">DAWNLINE II</div>
+  <h1>Sunrise Around the Globe</h1>
+  <div class="sub">Lights first. Then the sound check.</div>
+  <div class="readout" id="readout">initializing…</div>
+</div>
+
+<div class="cities panel">
+  <h2>◐ Dawn Happening Now</h2>
+  <ul id="cityList"></ul>
+</div>
+
+<div class="hint">
+  <b>Drag</b> spin · <b>scroll</b> zoom · <b>click</b> the globe to inspect a spot
+</div>
+
+<div class="controls panel">
+  <div class="group">
+    <span class="lbl">Speed</span>
+    <button data-speed="0">Pause</button>
+    <button data-speed="1" class="active">1×</button>
+    <button data-speed="120">120×</button>
+    <button data-speed="1800">30 min/s</button>
+    <button data-speed="14400">4 hr/s</button>
+  </div>
+  <div class="group">
+    <span class="lbl">Date</span>
+    <input id="dateInput" type="date">
+    <button id="now">Now</button>
+  </div>
+  <div class="group">
+    <span class="lbl">Time of day</span>
+    <input id="scrub" type="range" min="0" max="86400" step="60" value="0">
+  </div>
+</div>
+
+<div id="tip" class="tip" style="display:none"></div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============================================================
+//  ASTRONOMY  (NOAA-style solar position)
+// ============================================================
+const DEG = Math.PI/180, RAD = 180/Math.PI;
+
+function sunPosition(date) {
+  // Julian day (from ms epoch)
+  const jd = date.getTime()/86400000 + 2440587.5;
+  const d = jd - 2451545.0; // days since J2000
+  // Mean longitude & anomaly
+  const L = ((280.460 + 0.9856474*d) % 360 + 360) % 360;
+  const g = (((357.528 + 0.9856003*d) % 360 + 360) % 360) * DEG;
+  // Ecliptic longitude
+  const lambda = (L + 1.915*Math.sin(g) + 0.020*Math.sin(2*g)) * DEG;
+  // Obliquity
+  const eps = (23.439 - 0.0000004*d) * DEG;
+  // Right ascension & declination
+  const alpha = Math.atan2(Math.cos(eps)*Math.sin(lambda), Math.cos(lambda));
+  const decl  = Math.asin(Math.sin(eps)*Math.sin(lambda));
+  // GMST (radians)
+  const gmst_h = ((18.697374558 + 24.06570982441908*d) % 24 + 24) % 24;
+  const gmst = gmst_h * 15 * DEG;
+  // Subsolar longitude (east positive), normalize to [-π, π]
+  let subLon = alpha - gmst;
+  subLon = ((subLon + Math.PI) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI) - Math.PI;
+  return { decl, subLon }; // radians
+}
+
+// Sun direction in three.js's default-sphere world frame:
+//   world +X = lon 0°, world +Y = north pole, world -Z = lon +90°E
+function sunDirVector(date) {
+  const { decl, subLon } = sunPosition(date);
+  return new THREE.Vector3(
+    Math.cos(subLon) * Math.cos(decl),
+    Math.sin(decl),
+    -Math.sin(subLon) * Math.cos(decl)
+  ).normalize();
+}
+
+// altitude (degrees) of sun at (lat, lon) in degrees, at given date
+function sunAltitudeDeg(lat, lon, date) {
+  const { decl, subLon } = sunPosition(date);
+  const latR = lat*DEG, lonR = lon*DEG;
+  const cosZ = Math.sin(latR)*Math.sin(decl) +
+               Math.cos(latR)*Math.cos(decl)*Math.cos(lonR - subLon);
+  return Math.asin(Math.max(-1, Math.min(1, cosZ))) * RAD;
+}
+// hour angle in [-π, π]: negative = morning, positive = afternoon
+function hourAngle(lon, date) {
+  const { subLon } = sunPosition(date);
+  let H = lon*DEG - subLon;
+  H = ((H + Math.PI) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI) - Math.PI;
+  return H;
+}
+
+// ============================================================
+//  SCENE
+// ============================================================
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(0, 0.4, 4.2);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 1.6;
+controls.maxDistance = 10;
+controls.enablePan = false;
+controls.rotateSpeed = 0.5;
+
+// starfield ---------------------------------------------------
+(function stars(){
+  const g = new THREE.BufferGeometry();
+  const N = 4000;
+  const pos = new Float32Array(N*3);
+  const sizes = new Float32Array(N);
+  for (let i=0;i<N;i++){
+    const r = 50 + Math.random()*30;
+    const t = Math.random()*Math.PI*2;
+    const p = Math.acos(2*Math.random()-1);
+    pos[i*3]   = r*Math.sin(p)*Math.cos(t);
+    pos[i*3+1] = r*Math.cos(p);
+    pos[i*3+2] = r*Math.sin(p)*Math.sin(t);
+    sizes[i] = Math.random() < 0.03 ? 0.18 : 0.06;
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({
+    color:0xaabbcc, size:0.09, sizeAttenuation:true,
+    transparent:true, opacity:0.85
+  })));
+})();
+
+// ============================================================
+//  EARTH: real textures + custom shader with twilight bands
+// ============================================================
+
+// three-globe hosts these on unpkg with CORS open.
+const CDN = 'https://unpkg.com/three-globe@2.31.1/example/img/';
+const texLoader = new THREE.TextureLoader();
+texLoader.crossOrigin = 'anonymous';
+
+function loadTex(name) {
+  return new Promise(resolve => {
+    texLoader.load(CDN + name,
+      t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; resolve(t); },
+      undefined,
+      err => { console.warn('tex fail', name, err); resolve(null); }
+    );
+  });
+}
+
+// EARTH SHADER — day/night blend with three-band twilight
+const earthMat = new THREE.ShaderMaterial({
+  uniforms: {
+    dayMap:    { value: null },
+    nightMap:  { value: null },
+    sunDir:    { value: new THREE.Vector3(1,0,0) },
+    nightBoost:{ value: 1.4 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vWorldN;
+    void main(){
+      vUv = uv;
+      // model has no rotation, so local == world direction on unit sphere
+      vWorldN = normalize(position);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D dayMap;
+    uniform sampler2D nightMap;
+    uniform vec3 sunDir;
+    uniform float nightBoost;
+    varying vec2 vUv;
+    varying vec3 vWorldN;
+
+    void main(){
+      float d = dot(normalize(vWorldN), normalize(sunDir));  // -1..1
+
+      vec3 dayC   = texture2D(dayMap,   vUv).rgb;
+      vec3 nightC = texture2D(nightMap, vUv).rgb * nightBoost;
+
+      // day/night blend over civil twilight width (~sin(6°) ≈ 0.10)
+      float dayMix = smoothstep(-0.10, 0.15, d);
+      vec3 col = mix(nightC, dayC, dayMix);
+
+      // ---- THREE TWILIGHT BANDS ----
+      // astronomical  d ~ -0.31 (sin -18°)  deep blue
+      // nautical      d ~ -0.21 (sin -12°)  purple
+      // civil         d ~ -0.10 (sin  -6°)  orange
+      // sunrise       d ~  0.00              hot orange
+      float astro   = exp(-pow((d + 0.28)/0.05, 2.0));
+      float naut    = exp(-pow((d + 0.18)/0.05, 2.0));
+      float civil   = exp(-pow((d + 0.08)/0.05, 2.0));
+      float horizon = exp(-pow((d - 0.00)/0.04, 2.0));
+
+      col += vec3(0.15, 0.20, 0.55) * astro   * 0.35;
+      col += vec3(0.55, 0.25, 0.70) * naut    * 0.45;
+      col += vec3(1.00, 0.50, 0.20) * civil   * 0.70;
+      col += vec3(1.00, 0.75, 0.35) * horizon * 0.55;
+
+      // gentle brightening toward noon
+      col *= 0.88 + 0.22 * max(d, 0.0);
+
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+});
+
+const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 128), earthMat);
+scene.add(earth);
+
+// CLOUDS ------------------------------------------------------
+const cloudMat = new THREE.ShaderMaterial({
+  transparent:true, depthWrite:false,
+  uniforms: {
+    cloudMap: { value: null },
+    sunDir:   { value: earthMat.uniforms.sunDir.value },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vWorldN;
+    void main(){
+      vUv = uv;
+      vWorldN = normalize(position);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D cloudMap;
+    uniform vec3 sunDir;
+    varying vec2 vUv;
+    varying vec3 vWorldN;
+    void main(){
+      float a = texture2D(cloudMap, vUv).r;   // grayscale
+      if (a < 0.05) discard;
+      float d = dot(normalize(vWorldN), normalize(sunDir));
+      float lit = smoothstep(-0.15, 0.25, d);
+      vec3 col = mix(vec3(0.05,0.05,0.10), vec3(1.0), lit);
+      // pink-tint clouds along terminator
+      float term = exp(-pow(d/0.10, 2.0));
+      col += vec3(1.0, 0.55, 0.35) * term * 0.35;
+      gl_FragColor = vec4(col, a * (0.35 + 0.55*lit));
+    }
+  `
+});
+const clouds = new THREE.Mesh(new THREE.SphereGeometry(1.008, 96, 96), cloudMat);
+scene.add(clouds);
+
+// ATMOSPHERE HALO --------------------------------------------
+const atmo = new THREE.Mesh(
+  new THREE.SphereGeometry(1.06, 96, 96),
+  new THREE.ShaderMaterial({
+    transparent:true, side:THREE.BackSide, depthWrite:false,
+    uniforms:{ sunDir: earthMat.uniforms.sunDir },
+    vertexShader:`
+      varying vec3 vN; varying vec3 vP;
+      void main(){
+        vN = normalize(normalMatrix*normal);
+        vP = normalize(position);
+        gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);
+      }`,
+    fragmentShader:`
+      varying vec3 vN; varying vec3 vP;
+      uniform vec3 sunDir;
+      void main(){
+        float rim = pow(1.0 - abs(dot(vN, vec3(0.0,0.0,1.0))), 2.6);
+        float d = dot(vP, normalize(sunDir));
+        float lit = clamp(d*0.5+0.6, 0.0, 1.0);
+        vec3 dayBlue  = vec3(0.20, 0.45, 0.90);
+        vec3 dawnWarm = vec3(1.00, 0.55, 0.30);
+        vec3 c = mix(dayBlue, dawnWarm, pow(1.0-lit, 2.5));
+        gl_FragColor = vec4(c, rim*0.70);
+      }`
+  })
+);
+scene.add(atmo);
+
+// load textures -----------------------------------------------
+Promise.all([
+  loadTex('earth-blue-marble.jpg'),
+  loadTex('earth-night.jpg'),
+  loadTex('clouds.png'),
+]).then(([day, night, cloud]) => {
+  earthMat.uniforms.dayMap.value = day;
+  earthMat.uniforms.nightMap.value = night || day; // fallback
+  if (cloud) {
+    cloudMat.uniforms.cloudMap.value = cloud;
+  } else {
+    clouds.visible = false;
+  }
+  document.getElementById('loading').classList.add('hide');
+  setTimeout(() => document.getElementById('loading').remove(), 700);
+});
+
+// ============================================================
+//  CITIES  (for the "Dawn Happening Now" panel)
+// ============================================================
+const CITIES = [
+  ['Tokyo',35.68,139.69],['Seoul',37.57,126.98],['Beijing',39.90,116.41],
+  ['Shanghai',31.23,121.47],['Hong Kong',22.32,114.17],['Taipei',25.03,121.57],
+  ['Manila',14.60,120.98],['Bangkok',13.76,100.50],['Singapore',1.35,103.82],
+  ['Jakarta',-6.21,106.85],['Sydney',-33.87,151.21],['Auckland',-36.85,174.76],
+  ['Delhi',28.61,77.21],['Mumbai',19.08,72.88],['Karachi',24.86,67.01],
+  ['Dubai',25.20,55.27],['Tehran',35.69,51.39],['Moscow',55.75,37.62],
+  ['Istanbul',41.01,28.98],['Cairo',30.04,31.24],['Nairobi',-1.29,36.82],
+  ['Lagos',6.52,3.38],['Johannesburg',-26.20,28.05],['Athens',37.98,23.73],
+  ['Rome',41.90,12.50],['Berlin',52.52,13.40],['Paris',48.86,2.35],
+  ['London',51.51,-0.13],['Madrid',40.42,-3.70],['Lisbon',38.72,-9.14],
+  ['Reykjavik',64.15,-21.94],['São Paulo',-23.55,-46.63],['Buenos Aires',-34.61,-58.40],
+  ['Lima',-12.05,-77.04],['Bogotá',4.71,-74.07],['Mexico City',19.43,-99.13],
+  ['New York',40.71,-74.01],['Toronto',43.65,-79.38],['Chicago',41.88,-87.63],
+  ['Denver',39.74,-104.99],['Los Angeles',34.05,-118.24],['Vancouver',49.28,-123.12],
+  ['Anchorage',61.22,-149.90],['Honolulu',21.31,-157.86],['West Chester PA',39.96,-75.60],
+];
+
+function cityPhase(alt, H) {
+  // H<0 morning, H>0 evening
+  if (H < 0) {
+    if (alt >= -0.5 && alt <= 6)  return 'SUNRISE';
+    if (alt >= -6 && alt < -0.5)  return 'CIVIL DAWN';
+    if (alt >= -12 && alt < -6)   return 'NAUTICAL';
+    if (alt >= -18 && alt < -12)  return 'ASTRONOMICAL';
+  } else {
+    if (alt >= -0.5 && alt <= 6)  return 'SUNSET';
+    if (alt >= -6 && alt < -0.5)  return 'CIVIL DUSK';
+  }
+  return null;
+}
+
+function updateCityList(date) {
+  const rows = [];
+  for (const [name, lat, lon] of CITIES) {
+    const alt = sunAltitudeDeg(lat, lon, date);
+    const H = hourAngle(lon, date);
+    const phase = cityPhase(alt, H);
+    if (phase && (phase.includes('DAWN') || phase.includes('SUNRISE') ||
+                  phase.includes('NAUTICAL') || phase.includes('ASTRONOMICAL'))) {
+      rows.push({ name, alt, phase, sortKey: -alt });
+    }
+  }
+  rows.sort((a,b) => a.sortKey - b.sortKey);
+  const ul = document.getElementById('cityList');
+  if (rows.length === 0) {
+    ul.innerHTML = '<div class="empty">no cities in dawn window right now — try scrubbing time</div>';
+    return;
+  }
+  ul.innerHTML = rows.slice(0, 10).map(r =>
+    `<li><span>${r.name}<div class="phase">${r.phase}</div></span>` +
+    `<span class="alt">${r.alt.toFixed(1)}°</span></li>`
+  ).join('');
+}
+
+// ============================================================
+//  CLICK-TO-INSPECT
+// ============================================================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tip = document.getElementById('tip');
+
+renderer.domElement.addEventListener('click', (e) => {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(earth);
+  if (hits.length === 0) { tip.style.display = 'none'; return; }
+  const p = hits[0].point.clone().normalize();
+  // world +X = lon 0, world -Z = lon +90E
+  const lat = Math.asin(p.y) * RAD;
+  const lon = Math.atan2(-p.z, p.x) * RAD;
+  const alt = sunAltitudeDeg(lat, lon, simTime);
+  const H = hourAngle(lon, simTime);
+  const phase = cityPhase(alt, H);
+  let state;
+  if (alt > 6)         state = 'sun is high';
+  else if (alt > -0.5) state = H < 0 ? 'sun is rising' : 'sun is setting';
+  else if (alt > -18)  state = H < 0 ? 'before sunrise (twilight)' : 'after sunset (twilight)';
+  else                 state = 'deep night';
+
+  tip.innerHTML =
+    `<b>${Math.abs(lat).toFixed(2)}° ${lat>=0?'N':'S'}, ` +
+    `${Math.abs(lon).toFixed(2)}° ${lon>=0?'E':'W'}</b><br>` +
+    `sun altitude: <b>${alt.toFixed(1)}°</b><br>` +
+    `${state}` +
+    (phase ? `<div class="phase">${phase}</div>` : '');
+  tip.style.display = 'block';
+  tip.style.left = (e.clientX + 12) + 'px';
+  tip.style.top  = (e.clientY + 12) + 'px';
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') tip.style.display='none'; });
+
+// ============================================================
+//  TIME / CONTROLS
+// ============================================================
+let simTime = new Date();     // simulated UTC time
+let speed = 1;
+let lastFrame = performance.now();
+
+// buttons
+const buttons = document.querySelectorAll('.controls button[data-speed]');
+buttons.forEach(b => b.addEventListener('click', () => {
+  speed = parseFloat(b.dataset.speed);
+  buttons.forEach(x=>x.classList.toggle('active', x===b));
+}));
+
+// "Now" button
+document.getElementById('now').addEventListener('click', () => {
+  simTime = new Date();
+  syncInputs();
+});
+
+// date input
+const dateInput = document.getElementById('dateInput');
+dateInput.addEventListener('change', () => {
+  const [y,m,d] = dateInput.value.split('-').map(Number);
+  const t = new Date(simTime);
+  t.setUTCFullYear(y, m-1, d);
+  simTime = t;
+});
+
+// time-of-day scrubber
+const scrub = document.getElementById('scrub');
+scrub.addEventListener('input', () => {
+  const t = new Date(simTime);
+  t.setUTCHours(0,0,0,0);
+  t.setUTCSeconds(parseInt(scrub.value,10));
+  simTime = t;
+  // pause when user scrubs
+  speed = 0;
+  buttons.forEach(x=>x.classList.toggle('active', x.dataset.speed==="0"));
+});
+
+function syncInputs() {
+  const y = simTime.getUTCFullYear();
+  const m = String(simTime.getUTCMonth()+1).padStart(2,'0');
+  const d = String(simTime.getUTCDate()).padStart(2,'0');
+  dateInput.value = `${y}-${m}-${d}`;
+  const midnight = new Date(simTime); midnight.setUTCHours(0,0,0,0);
+  scrub.value = Math.floor((simTime - midnight)/1000);
+}
+syncInputs();
+
+// ============================================================
+//  READOUT
+// ============================================================
+const readout = document.getElementById('readout');
+function fmtLon(rad){
+  const deg = rad * RAD;
+  const hemi = deg>=0 ? 'E' : 'W';
+  return `${Math.abs(deg).toFixed(1)}° ${hemi}`;
+}
+function fmtLat(rad){
+  const deg = rad * RAD;
+  const hemi = deg>=0 ? 'N' : 'S';
+  return `${Math.abs(deg).toFixed(1)}° ${hemi}`;
+}
+function seasonName(declDeg, date) {
+  const m = date.getUTCMonth();
+  if (declDeg > 20)  return 'northern summer';
+  if (declDeg < -20) return 'southern summer';
+  return m < 6 ? 'northern spring' : 'northern autumn';
+}
+
+// ============================================================
+//  ANIMATION LOOP
+// ============================================================
+let cloudRot = 0;
+function tick(now){
+  const dt = (now - lastFrame)/1000; lastFrame = now;
+  if (speed > 0) {
+    simTime = new Date(simTime.getTime() + dt*1000*speed);
+    if (speed > 5) syncInputs();
+  }
+
+  const s = sunPosition(simTime);
+  const sunDir = sunDirVector(simTime);
+  earthMat.uniforms.sunDir.value.copy(sunDir);
+  // cloudMat & atmo share the same uniform object — no copy needed
+
+  // drift clouds slowly (independent of Earth's rotation, since Earth mesh is fixed)
+  cloudRot += dt * 0.008;
+  clouds.rotation.y = cloudRot;
+
+  // readout
+  const utc = simTime.toUTCString().replace('GMT','UTC');
+  const local = simTime.toLocaleString(undefined, { dateStyle:'medium', timeStyle:'medium' });
+  readout.innerHTML =
+    `<b>${local}</b><br>` +
+    `<span class="small">${utc}</span><br>` +
+    `sun over <b>${fmtLon(s.subLon)}</b>, <b>${fmtLat(s.decl)}</b><br>` +
+    `<span class="small">declination ${(s.decl*RAD).toFixed(1)}° · ${seasonName(s.decl*RAD, simTime)}</span>`;
+
+  updateCityList(simTime);
+
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

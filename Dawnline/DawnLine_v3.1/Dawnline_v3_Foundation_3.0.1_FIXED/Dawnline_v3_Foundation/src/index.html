@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Dawnline III — World Clock</title>
+  <!-- DAWNLINE_V3_INLINE_CSS_SLOT_8F13C7 -->
+</head>
+<body>
+  <main id="stage" aria-label="Interactive Earth showing the live boundary between night, dawn, and day"></main>
+  <div id="vignette" aria-hidden="true"></div>
+
+  <section id="loading" class="loading" role="status" aria-live="polite">
+    <div class="loading-card">
+      <div class="loading-mark">◐</div>
+      <div id="loading-title" class="loading-title">Starting Dawnline</div>
+      <div id="loading-detail" class="loading-detail">Loading the local Earth textures…</div>
+    </div>
+  </section>
+
+  <section id="fatal" class="fatal panel" hidden role="alert">
+    <h2>Dawnline could not start</h2>
+    <p id="fatal-message"></p>
+  </section>
+
+  <header class="clock panel" id="clock-panel">
+    <div class="clock-topline">
+      <span class="eyebrow">DAWNLINE III</span>
+      <span id="mode-badge" class="mode-badge live">LIVE</span>
+      <button id="clock-minimize-btn" class="clock-minimize-btn" type="button" title="Minimize clock">−</button>
+    </div>
+    <div id="clock-content" class="clock-content">
+      <div id="local-time" class="local-time">--:--:--</div>
+      <div id="local-date" class="local-date">—</div>
+      <div class="clock-meta">
+        <span id="utc-time">UTC —</span>
+        <span class="meta-separator">·</span>
+        <span id="solar-position">Sun over —</span>
+      </div>
+      <div id="rotation-indicator" class="rotation-indicator">
+        <div class="rotation-spinner"></div>
+        <span>Rotating</span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="top-actions" aria-label="Dawnline actions">
+    <button id="controls-toggle" class="icon-button panel" type="button" aria-expanded="false" aria-controls="control-panel" title="Open controls">Controls</button>
+    <button id="fullscreen" class="icon-button panel" type="button" title="Toggle fullscreen">Fullscreen</button>
+  </nav>
+
+  <aside id="hint" class="hint panel">
+    <b>Drag</b> to turn Earth · <b>scroll</b> to zoom · <b>click</b> a place to inspect its light
+  </aside>
+
+  <section id="control-panel" class="controls panel" aria-label="Dawnline controls" hidden>
+    <div class="control-header">
+      <div>
+        <div class="eyebrow">CLOCK CONTROL</div>
+        <div id="control-state" class="control-state">Following the current time</div>
+      </div>
+      <button id="controls-close" class="close-button" type="button" aria-label="Close controls">×</button>
+    </div>
+
+    <div class="control-section">
+      <div class="section-label">Time</div>
+      <div class="button-row" id="speed-buttons">
+        <button type="button" data-speed="0">Pause</button>
+        <button type="button" data-speed="1">1×</button>
+        <button type="button" data-speed="120">120×</button>
+        <button type="button" data-speed="1800">30 min/s</button>
+        <button type="button" data-speed="14400">4 hr/s</button>
+      </div>
+      <div class="date-row">
+        <label>
+          <span>Date (UTC)</span>
+          <input id="date-input" type="date" />
+        </label>
+        <button id="now" class="primary-button" type="button">Return to now</button>
+      </div>
+      <label class="scrub-row">
+        <span id="scrub-label">Time of day (UTC)</span>
+        <input id="scrub" type="range" min="0" max="86399" step="1" value="0" />
+      </label>
+    </div>
+
+    <div class="control-section">
+      <div class="section-label">Location</div>
+      <div class="location-row">
+        <label>
+          <span>ZIP code (US)</span>
+          <input id="zip-input" type="text" placeholder="e.g., 10001" maxlength="5" />
+        </label>
+        <button id="home-button" class="primary-button" type="button">Set home</button>
+        <button id="reset-home-button" class="primary-button" type="button">Reset view</button>
+      </div>
+      <div id="location-display" class="location-display" hidden></div>
+    </div>
+
+    <div class="control-section">
+      <div class="section-label">Layers
+        <button id="dawn-info-button" class="info-button" type="button" title="Learn about dawn types">?</button>
+      </div>
+      <div class="toggle-grid">
+        <label class="toggle"><input id="layer-stars" type="checkbox" checked /><span>Stars</span></label>
+        <label class="toggle"><input id="layer-lights" type="checkbox" checked /><span>Night lights</span></label>
+        <label class="toggle"><input id="layer-twilight" type="checkbox" checked /><span>Twilight bands</span></label>
+        <label class="toggle"><input id="layer-clouds" type="checkbox" checked /><span>Clouds</span></label>
+        <label class="toggle"><input id="layer-atmosphere" type="checkbox" checked /><span>Atmosphere</span></label>
+        <label class="toggle"><input id="auto-rotate" type="checkbox" /><span>Slow rotation</span></label>
+      </div>
+    </div>
+
+    <div class="control-footer">
+      <span><kbd>Space</kbd> pause/resume</span>
+      <span><kbd>N</kbd> now</span>
+      <span><kbd>C</kbd> controls</span>
+    </div>
+  </section>
+
+  <div id="tip" class="tip" hidden></div>
+
+  <div id="dawn-modal" class="modal" hidden role="dialog" aria-labelledby="dawn-modal-title">
+    <div class="modal-content panel">
+      <div class="modal-header">
+        <h2 id="dawn-modal-title">Understanding Dawn and Dusk</h2>
+        <button id="dawn-modal-close" class="close-button" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="dawn-type">
+          <h3>Civil Dawn / Dusk</h3>
+          <p>The sun is 6° below the horizon. Enough light to see objects without artificial light; horizon is clearly defined.</p>
+        </div>
+        <div class="dawn-type">
+          <h3>Nautical Dawn / Dusk</h3>
+          <p>The sun is 12° below the horizon. Twilight is less pronounced; horizon is not clearly visible. Historically used for maritime navigation.</p>
+        </div>
+        <div class="dawn-type">
+          <h3>Astronomical Dawn / Dusk</h3>
+          <p>The sun is 18° below the horizon. The last phase before full darkness. Used by astronomers to determine when it's dark enough for observations.</p>
+        </div>
+        <div class="dawn-type">
+          <h3>The Twilight Bands</h3>
+          <p>The colorful gradient you see at the sunrise/sunset boundary shows all three twilight phases at once, sweeping across the globe as Earth rotates.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      window.__DAWNLINE_BOOTED__ = false;
+      const exposeBootFailure = (message) => {
+        const loadingTitle = document.getElementById('loading-title');
+        const loadingDetail = document.getElementById('loading-detail');
+        if (loadingTitle) loadingTitle.textContent = 'Dawnline did not start';
+        if (loadingDetail) loadingDetail.textContent = message || 'A startup error occurred before the application could report it.';
+      };
+      window.addEventListener('error', (event) => {
+        if (!window.__DAWNLINE_BOOTED__) {
+          exposeBootFailure(event.message || 'JavaScript startup error');
+        }
+      });
+      window.setTimeout(() => {
+        if (!window.__DAWNLINE_BOOTED__) {
+          exposeBootFailure('The application did not complete its startup sequence.');
+        }
+      }, 5000);
+    })();
+  </script>
+
+  <!-- DAWNLINE_V3_INLINE_JS_SLOT_4A91DE -->
+</body>
+</html>

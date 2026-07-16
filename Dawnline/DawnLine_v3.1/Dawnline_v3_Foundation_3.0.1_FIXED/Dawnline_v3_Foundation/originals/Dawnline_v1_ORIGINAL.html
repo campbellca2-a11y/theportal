@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Dawnline — Sunrise Around the Globe</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root {
+    --ink: #e9eef7;
+    --dim: #8a93a6;
+    --line: rgba(255,255,255,0.10);
+    --panel: rgba(10,14,22,0.55);
+    --accent: #ffb86b;
+  }
+  html,body { margin:0; height:100%; background:#05070d; color:var(--ink);
+    font: 14px/1.4 -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    overflow:hidden; }
+  #stage { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  .hud {
+    position:fixed; left:16px; top:16px; padding:14px 16px;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; backdrop-filter: blur(8px);
+    min-width: 260px; box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  }
+  .hud h1 { margin:0 0 2px; font-size:18px; letter-spacing:0.5px;}
+  .hud .sub { color:var(--dim); font-size:12px; margin-bottom:10px; }
+  .readout { font-variant-numeric: tabular-nums; font-size:13px; line-height:1.6; }
+  .readout b { color:var(--accent); font-weight:600; }
+
+  .controls {
+    position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:10px 14px; backdrop-filter: blur(8px);
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  }
+  .controls button {
+    background:#141a26; color:var(--ink); border:1px solid var(--line);
+    padding:6px 10px; border-radius:8px; cursor:pointer; font-size:12px;
+  }
+  .controls button.active { border-color:var(--accent); color:var(--accent); }
+  .controls button:hover { background:#1c2434; }
+  .controls input[type=range] { width:280px; }
+  .controls .lbl { color:var(--dim); font-size:12px; }
+
+  .hint {
+    position:fixed; right:16px; top:16px; background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; padding:10px 12px;
+    color:var(--dim); font-size:12px; max-width:240px; backdrop-filter: blur(8px);
+  }
+  .hint b { color:var(--ink); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div class="hud">
+  <h1>Dawnline</h1>
+  <div class="sub">Lights first. Then the sound check.</div>
+  <div class="readout" id="readout">loading…</div>
+</div>
+
+<div class="hint">
+  <b>Drag</b> to spin the globe · <b>scroll</b> to zoom.<br>
+  Drag the slider below to move the sun around the planet.
+</div>
+
+<div class="controls">
+  <button data-speed="0" class="active">Pause</button>
+  <button data-speed="1">Real time</button>
+  <button data-speed="60">60×</button>
+  <button data-speed="600">600×</button>
+  <button data-speed="3600">1 hr / sec</button>
+  <button id="now">Now</button>
+  <span class="lbl">scrub sun →</span>
+  <input id="scrub" type="range" min="0" max="86400" step="60" value="0">
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ---------- scene ----------
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(0, 0.6, 4.2);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.minDistance = 2.2;
+controls.maxDistance = 8;
+controls.enablePan = false;
+
+// starfield
+{
+  const g = new THREE.BufferGeometry();
+  const N = 3000;
+  const pos = new Float32Array(N*3);
+  for (let i=0;i<N;i++){
+    const r = 40 + Math.random()*20;
+    const t = Math.random()*Math.PI*2;
+    const p = Math.acos(2*Math.random()-1);
+    pos[i*3]   = r*Math.sin(p)*Math.cos(t);
+    pos[i*3+1] = r*Math.cos(p);
+    pos[i*3+2] = r*Math.sin(p)*Math.sin(t);
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color:0x8899bb, size:0.08, sizeAttenuation:true, transparent:true, opacity:0.7 })));
+}
+
+// ---------- Earth (procedural, no external textures) ----------
+// Day side: blue oceans + green/tan continents drawn via a procedural canvas.
+// Night side: dark + faint city-light glow.
+// A custom shader blends them based on sun direction so dawn glows orange.
+
+function makeEarthDayTexture(w=2048, h=1024) {
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx = c.getContext('2d');
+  // ocean gradient
+  const og = ctx.createLinearGradient(0,0,0,h);
+  og.addColorStop(0, '#0a2a55');
+  og.addColorStop(0.5,'#0e4a82');
+  og.addColorStop(1, '#0a2a55');
+  ctx.fillStyle = og; ctx.fillRect(0,0,w,h);
+
+  // simple continent silhouettes via equirectangular polygons (lon,lat)
+  // these are crude but recognizable from orbit
+  const land = [
+    // N America
+    [[-168,66],[-140,70],[-95,72],[-75,60],[-55,50],[-65,40],[-80,25],[-100,18],[-110,23],[-118,32],[-125,40],[-130,55],[-160,60]],
+    // S America
+    [[-80,12],[-60,10],[-50,0],[-40,-8],[-38,-22],[-55,-35],[-70,-52],[-75,-40],[-78,-20],[-80,-5]],
+    // Europe
+    [[-10,36],[5,43],[15,38],[28,40],[35,45],[40,55],[30,62],[15,65],[5,58],[-5,52],[-10,45]],
+    // Africa
+    [[-17,15],[5,5],[12,4],[20,12],[35,15],[42,12],[50,0],[42,-15],[30,-30],[18,-35],[10,-22],[0,-5],[-15,5]],
+    // Asia
+    [[40,55],[60,62],[90,70],[140,72],[160,65],[175,55],[160,40],[140,30],[120,22],[100,15],[80,10],[70,20],[50,30],[45,40]],
+    // India
+    [[68,24],[78,28],[88,22],[80,8],[72,12]],
+    // SE Asia / Indonesia
+    [[95,5],[110,0],[125,-3],[140,-5],[130,-8],[115,-9],[100,-2]],
+    // Australia
+    [[114,-12],[135,-12],[150,-18],[152,-28],[140,-38],[120,-34],[114,-22]],
+    // Greenland
+    [[-50,60],[-40,72],[-25,80],[-15,75],[-30,62]],
+    // Antarctica strip
+    [[-180,-72],[-120,-78],[-60,-78],[0,-75],[60,-78],[120,-78],[180,-72],[180,-90],[-180,-90]],
+  ];
+
+  function ll2xy(lon,lat){ return [ (lon+180)/360*w, (90-lat)/180*h ]; }
+
+  ctx.fillStyle = '#2f5a2a';
+  for (const poly of land) {
+    ctx.beginPath();
+    poly.forEach((p,i)=>{
+      const [x,y] = ll2xy(p[0],p[1]);
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.closePath();
+    ctx.fill();
+  }
+  // light noise / desert tinting
+  const img = ctx.getImageData(0,0,w,h);
+  const d = img.data;
+  for (let i=0;i<d.length;i+=4){
+    const n = (Math.random()-0.5)*18;
+    d[i]   = Math.max(0, Math.min(255, d[i]+n));
+    d[i+1] = Math.max(0, Math.min(255, d[i+1]+n));
+    d[i+2] = Math.max(0, Math.min(255, d[i+2]+n));
+  }
+  ctx.putImageData(img,0,0);
+
+  // soft latitude shading (poles colder/whiter)
+  const pg = ctx.createLinearGradient(0,0,0,h);
+  pg.addColorStop(0, 'rgba(220,235,250,0.35)');
+  pg.addColorStop(0.15,'rgba(220,235,250,0)');
+  pg.addColorStop(0.85,'rgba(220,235,250,0)');
+  pg.addColorStop(1, 'rgba(220,235,250,0.35)');
+  ctx.fillStyle = pg; ctx.fillRect(0,0,w,h);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+function makeNightTexture(w=2048,h=1024){
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#000'; ctx.fillRect(0,0,w,h);
+  // city light blobs around populated lon/lat ranges
+  const hotspots = [
+    [-74,40,90],[-87,42,60],[-118,34,70],[-99,19,60], // N America
+    [-46,-23,70],[-58,-34,55],                        // S America
+    [2,48,90],[13,52,70],[12,42,60],[-3,40,55],[37,55,80], // Europe
+    [3,6,55],[31,30,55],[28,-26,45],                  // Africa
+    [77,28,90],[72,19,80],[88,22,70],                 // India
+    [116,40,100],[121,31,100],[114,22,90],[127,37,85],[139,35,100], // E Asia
+    [120,14,55],[106,-6,55],[151,-33,55],[174,-36,40] // SE Asia / Oceania
+  ];
+  for (const [lon,lat,intensity] of hotspots){
+    const x = (lon+180)/360*w, y=(90-lat)/180*h;
+    const r = 28 + intensity*0.5;
+    const g = ctx.createRadialGradient(x,y,0,x,y,r);
+    g.addColorStop(0, `rgba(255,210,120,${intensity/180})`);
+    g.addColorStop(1, 'rgba(255,210,120,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+    // sparkles
+    for (let i=0;i<intensity;i++){
+      const sx = x + (Math.random()-0.5)*r*1.6;
+      const sy = y + (Math.random()-0.5)*r*1.2;
+      ctx.fillStyle = `rgba(255,230,170,${Math.random()*0.6})`;
+      ctx.fillRect(sx,sy,1,1);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const dayMap   = makeEarthDayTexture();
+const nightMap = makeNightTexture();
+
+// custom shader: blend day/night by sun direction, with orange dawn band
+const earthMat = new THREE.ShaderMaterial({
+  uniforms: {
+    dayMap:   { value: dayMap },
+    nightMap: { value: nightMap },
+    sunDir:   { value: new THREE.Vector3(1,0,0) },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    void main(){
+      vUv = uv;
+      vNormal = normalize(normalMatrix * normal);
+      // we'll also pass world-space normal via a second varying
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D dayMap;
+    uniform sampler2D nightMap;
+    uniform vec3 sunDir; // in world space, normalized
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    void main(){
+      // approximate world normal from view normal — fine because we rotate the mesh, not the camera, for sun
+      vec3 n = normalize(vNormal);
+      // we need world-space dot. Re-derive from sphere UV:
+      // u in [0,1] -> lon in [-PI, PI], v in [0,1] -> lat in [PI/2, -PI/2]
+      float lon = (vUv.x - 0.5) * 6.2831853;
+      float lat = (0.5 - vUv.y) * 3.1415926;
+      vec3 worldN = vec3( cos(lat)*cos(lon), sin(lat), cos(lat)*sin(lon) );
+
+      float d = dot(worldN, normalize(sunDir)); // -1 night, +1 noon
+      vec3 dayC   = texture2D(dayMap,   vUv).rgb;
+      vec3 nightC = texture2D(nightMap, vUv).rgb;
+
+      // smooth day/night blend
+      float dayMix = smoothstep(-0.08, 0.18, d);
+      vec3 col = mix(nightC, dayC, dayMix);
+
+      // dawn/dusk glow band where d ~ 0
+      float band = exp(-pow(d/0.10, 2.0));   // narrow band around terminator
+      vec3 dawn = vec3(1.0, 0.55, 0.25);
+      col += dawn * band * 0.55;
+
+      // gentle day shading toward noon
+      col *= 0.85 + 0.25 * max(d, 0.0);
+
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+});
+
+const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 96), earthMat);
+scene.add(earth);
+
+// atmosphere halo
+const atmo = new THREE.Mesh(
+  new THREE.SphereGeometry(1.025, 96, 96),
+  new THREE.ShaderMaterial({
+    transparent:true, side:THREE.BackSide, depthWrite:false,
+    uniforms:{ sunDir:{ value: new THREE.Vector3(1,0,0) } },
+    vertexShader:`
+      varying vec3 vN; varying vec3 vP;
+      void main(){
+        vN = normalize(normalMatrix*normal);
+        vP = normalize(position);
+        gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);
+      }`,
+    fragmentShader:`
+      varying vec3 vN; varying vec3 vP;
+      uniform vec3 sunDir;
+      void main(){
+        float rim = pow(1.0 - abs(dot(vN, vec3(0.0,0.0,1.0))), 2.2);
+        float lit = clamp(dot(vP, normalize(sunDir))*0.5+0.6, 0.0, 1.0);
+        vec3 c = mix(vec3(0.15,0.35,0.75), vec3(1.0,0.7,0.4), pow(1.0-lit,3.0));
+        gl_FragColor = vec4(c, rim*0.65);
+      }`
+  })
+);
+scene.add(atmo);
+
+// ---------- sun direction from real time ----------
+// Earth-centered: we keep the Earth fixed and rotate the sun vector.
+// Approx: subsolar lon = -(UTC_seconds/86400 * 360 - 180) deg
+// subsolar lat = declination from day-of-year
+function subsolar(date) {
+  const utcSec = date.getUTCHours()*3600 + date.getUTCMinutes()*60 + date.getUTCSeconds();
+  const lonDeg = ((utcSec/86400)*360 + 180) % 360 - 180; // east positive
+  // declination (approx, Cooper's formula)
+  const start = Date.UTC(date.getUTCFullYear(),0,0);
+  const doy = Math.floor((date - start)/86400000);
+  const decl = 23.44 * Math.sin( (2*Math.PI/365) * (doy - 81) ) * Math.PI/180;
+  // subsolar point is opposite the longitude where it's noon... actually the sun is OVER lonDeg where local noon is.
+  // At UTC noon, sun over lon 0. So sun lon = -((utcSec - 12*3600)/86400)*360
+  const sunLonDeg = -((utcSec - 12*3600)/86400)*360;
+  const lonR = sunLonDeg * Math.PI/180;
+  const x = Math.cos(decl)*Math.cos(lonR);
+  const y = Math.sin(decl);
+  const z = Math.cos(decl)*Math.sin(lonR);
+  return { vec: new THREE.Vector3(x,y,z).normalize(), sunLonDeg, declDeg: decl*180/Math.PI };
+}
+
+// ---------- time / controls ----------
+let simTime = new Date();           // current simulated UTC time
+let speed = 0;                      // multiplier; 0 = paused
+let lastFrame = performance.now();
+
+const buttons = document.querySelectorAll('.controls button[data-speed]');
+buttons.forEach(b => b.addEventListener('click', () => {
+  speed = parseFloat(b.dataset.speed);
+  buttons.forEach(x=>x.classList.toggle('active', x===b));
+}));
+document.getElementById('now').addEventListener('click', () => {
+  simTime = new Date();
+});
+
+const scrub = document.getElementById('scrub');
+scrub.addEventListener('input', () => {
+  // set sim time to today UTC midnight + scrub seconds
+  const t = new Date(simTime);
+  t.setUTCHours(0,0,0,0);
+  t.setUTCSeconds(parseInt(scrub.value,10));
+  simTime = t;
+  // pause when scrubbing manually
+  speed = 0;
+  buttons.forEach(x=>x.classList.toggle('active', x.dataset.speed==="0"));
+});
+
+const readout = document.getElementById('readout');
+function fmtLon(deg){
+  const d = ((deg+540)%360)-180;
+  const hemi = d>=0 ? 'E' : 'W';
+  return `${Math.abs(d).toFixed(1)}° ${hemi}`;
+}
+function regionGuess(lonDeg){
+  const d = ((lonDeg+540)%360)-180;
+  // crude zone names by longitude
+  const zones = [
+    [-180,-150,'Central Pacific'], [-150,-120,'US West Coast / E Pacific'],
+    [-120,-90,'North America (Mountain/Central)'], [-90,-60,'Eastern N. America / Caribbean'],
+    [-60,-30,'W. Atlantic / E. S. America'], [-30,0,'E. Atlantic / W. Africa & Europe'],
+    [0,30,'Europe & W. Africa'], [30,60,'E. Europe / Middle East / E. Africa'],
+    [60,90,'Central Asia / India'], [90,120,'SE Asia / W. China'],
+    [120,150,'E. China / Japan / Philippines'], [150,180,'W. Pacific / Oceania']
+  ];
+  for (const [a,b,name] of zones) if (d>=a && d<b) return name;
+  return '—';
+}
+
+// ---------- animation ----------
+function tick(now){
+  const dt = (now - lastFrame)/1000; lastFrame = now;
+  if (speed > 0) simTime = new Date(simTime.getTime() + dt*1000*speed);
+
+  const s = subsolar(simTime);
+  earthMat.uniforms.sunDir.value.copy(s.vec);
+  atmo.material.uniforms.sunDir.value.copy(s.vec);
+
+  // readout
+  const utc = simTime.toUTCString().replace('GMT','UTC');
+  const local = simTime.toLocaleString();
+  readout.innerHTML =
+    `<b>${local}</b> &nbsp;<span style="color:var(--dim)">local</span><br>` +
+    `${utc}<br>` +
+    `sun over <b>${fmtLon(s.sunLonDeg)}</b> · ${regionGuess(s.sunLonDeg)}<br>` +
+    `solar declination ${s.declDeg.toFixed(1)}°`;
+
+  // keep scrub in sync when running
+  if (speed > 0) {
+    const t = new Date(simTime);
+    const midnight = new Date(t); midnight.setUTCHours(0,0,0,0);
+    scrub.value = Math.floor((t - midnight)/1000);
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
