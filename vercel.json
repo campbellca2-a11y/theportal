@@ -1,0 +1,4 @@
+{
+  "outputDirectory": "dist/client",
+  "buildCommand": "npm ci && npm run build"
+}

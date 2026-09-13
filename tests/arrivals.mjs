@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {receiveTally} from '../lib/arrival-feedback.ts';
+let checks=0;
+function check(value,name){assert.ok(value,name);checks++;console.log('PASS '+name)}
+const initial={total:8,count:8,revision:8};
+let result=receiveTally(null,initial);
+check(result.arrived===0,'existing files do not celebrate on initial load');
+result=receiveTally(initial,{total:9,count:9,revision:9});
+check(result.arrived===1,'new completed transfer produces one arrival');
+const one=result.tally;
+result=receiveTally(one,{total:9,count:9,revision:9});
+check(result.arrived===0,'upload response followed by same poll does not replay');
+result=receiveTally(one,initial);
+check(result.stale&&result.arrived===0&&result.tally.total===9,'out-of-order poll cannot rewind cursor or tally');
+result=receiveTally(one,{total:9,count:0,revision:10});
+check(result.arrived===0&&result.tally.count===0,'reset clears count without an arrival cue');
+const reset=result.tally;
+result=receiveTally(reset,one);
+check(result.stale&&result.tally.count===0,'old poll cannot undo reset');
+result=receiveTally(reset,{total:12,count:3,revision:13});
+check(result.arrived===3,'batch arrivals count each committed file');
+result=receiveTally(reset,{total:9,count:0,revision:10});
+check(result.arrived===0,'failed or canceled uploads with no commit do not signal');
+result=receiveTally(null,{total:12,count:3,revision:13});
+check(result.arrived===0&&result.tally.count===3,'browser reload keeps shared count without replaying history');
+console.log('All '+checks+' arrival cursor checks passed.');

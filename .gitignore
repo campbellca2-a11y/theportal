@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+.vscode/
+.idea/
+*.log
+*.swp
+.DS_Store
+Thumbs.db
+.portal-data/
