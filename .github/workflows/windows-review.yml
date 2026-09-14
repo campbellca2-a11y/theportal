@@ -37,7 +37,7 @@ jobs:
           foreach ($size in @('1280,1100', '390,1600')) {
             $out = Join-Path $pwd "release/preview-$($size.Replace(',', '-')).png"
             $profile = Join-Path $env:TEMP "portal-preview-$($size.Replace(',', '-'))"
-            $args = "--headless=new --disable-gpu --no-sandbox --no-first-run --user-data-dir=\`"$profile\`" --screenshot=\`"$out\`" --window-size=$size --virtual-time-budget=1500 \`"$url\`""
+            $args = "--headless=new --disable-gpu --no-sandbox --no-first-run --user-data-dir=`"$profile`" --screenshot=`"$out`" --window-size=$size --virtual-time-budget=1500 `"$url`""
             $p = Start-Process $chrome -ArgumentList $args -PassThru
             if (-not $p.WaitForExit(30000)) { $p.Kill(); throw 'Preview render timed out' }
             if (-not (Test-Path $out)) { throw 'Preview screenshot missing' }
