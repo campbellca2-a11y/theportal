@@ -1,0 +1,32 @@
+name: Windows installer review
+on:
+  push:
+    branches: [distribution/windows-installer-review]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:portable
+      - run: npm run test:service
+      - run: npm run test:arrivals
+      - name: Build Windows installer
+        shell: pwsh
+        run: ./packaging/windows/Build.ps1
+      - name: Install, launch, transfer, restart and uninstall
+        shell: pwsh
+        run: ./packaging/windows/Smoke.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ThePortal-Windows-review
+          path: release/*
+          if-no-files-found: error
