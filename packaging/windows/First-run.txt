@@ -1,0 +1,30 @@
+THEPORTAL — Put it here. Get it there.
+
+1. Open ThePortal from your desktop or Start menu.
+2. Keep your PC and phone on the same trusted home network.
+3. Click Connect phone on the PC, then scan its QR code with your phone.
+4. Drop a file into either Portal. Open or download it on the other device.
+
+The phone uses its browser; no phone app or account is required.
+Keep the PC awake. Closing the browser leaves ThePortal running.
+Use Start > ThePortal > Stop ThePortal when finished, after transfers complete.
+
+If Windows asks about network access, allow only Private networks on a
+trusted home network. Do not disable your firewall. Work-managed devices
+may need an administrator to permit local network access.
+If the phone cannot connect, check the network, PC sleep, VPN LAN settings,
+and guest Wi-Fi isolation.
+
+Files travel on your local network and are stored on this PC, not uploaded
+to the public download site. This version uses unencrypted local HTTP;
+pairing controls access but does not encrypt traffic.
+100 MB per file; 1 GB inbox. Remove only Portal copies through the app.
+Original files are untouched. Downloads already saved elsewhere remain.
+
+Inbox location: %LOCALAPPDATA%\ThePortal\Data
+Uninstalling preserves this inbox. A new install creates its own credentials;
+it does not import files or pairing from older copies automatically.
+
+Review build: unsigned. Windows may show an unknown-publisher or reputation
+warning. Do not disable security software. Broad public release awaits
+Windows/phone acceptance testing and a signing decision.
