@@ -28,7 +28,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: checkedonc
 Source: "..\..\build\windows\ThePortal.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\build\windows\runtime\*"; DestDir: "{app}\runtime"; Flags: ignoreversion
 Source: "..\..\ThePortal.runtime.mjs"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\ThePortal.runtime.mjs.LEGAL.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\ThePortal.runtime.mjs.LEGAL.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\..\THIRD-PARTY-NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\dist\client\*"; DestDir: "{app}\dist\client"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "First-run.txt"; DestDir: "{app}"; Flags: ignoreversion
