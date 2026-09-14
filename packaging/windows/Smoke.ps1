@@ -6,7 +6,9 @@ $data = Join-Path $env:LOCALAPPDATA 'ThePortal\Data'
 if (Test-Path $data) { throw 'Smoke test requires a fresh Windows user with no Portal data' }
 $setup = Join-Path $root 'release\ThePortalSetup-0.1.1-windows-x64.exe'
 function Run([string]$file, [string]$arguments) {
-    $p = Start-Process $file -ArgumentList $arguments -PassThru -Wait
+    $p = Start-Process $file -ArgumentList $arguments -PassThru
+    # Wait only for the launcher, not its intentionally long-lived server child.
+    if (-not $p.WaitForExit(90000)) { $p.Kill(); throw "$file timed out" }
     if ($p.ExitCode -ne 0) { throw "$file failed with exit code $($p.ExitCode)" }
 }
 $base = 'http://127.0.0.1:48831'
