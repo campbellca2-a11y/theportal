@@ -27,3 +27,10 @@ launch.log
 *.exe
 *.iss.bak
 _leftovers/
+
+# Installer build output
+build/
+release/
+ThePortal.runtime.mjs*
+next-env.d.ts
+packaging/windows/portal.ico
