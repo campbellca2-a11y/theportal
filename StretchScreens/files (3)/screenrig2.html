@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SCREENRIG II — Backroad Pursuit</title>
+<style>
+  :root{color-scheme:dark}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#04060c}
+  body{font-family:ui-monospace,"Cascadia Mono","Consolas",monospace}
+  canvas{display:block;width:100vw;height:100vh}
+
+  #hud{position:fixed;top:14px;left:16px;font-size:11px;line-height:1.75;letter-spacing:.13em;
+       color:#8fe6ff;text-shadow:0 0 14px rgba(80,200,255,.55);pointer-events:none;white-space:pre}
+  #hud .k{color:#ff9b3d}
+
+  #panelTag{position:fixed;top:14px;right:16px;font-size:22px;font-weight:700;letter-spacing:.08em;
+       color:#ff9b3d;text-shadow:0 0 16px rgba(242,96,13,.6);pointer-events:none}
+
+  #dashboard{position:fixed;left:16px;bottom:18px;display:flex;flex-direction:column;gap:10px;
+       padding:12px 16px;background:rgba(10,16,26,.62);border:1px solid rgba(143,230,255,.28);
+       border-radius:4px;font-family:ui-monospace,"Cascadia Mono","Consolas",monospace;
+       box-shadow:0 0 18px rgba(80,200,255,.12)}
+  #dashboard.hidden{display:none}
+  .dgroup{display:flex;align-items:center;gap:10px}
+  .dlabel{color:#8fe6ff;font-size:10px;letter-spacing:.14em;width:58px;text-shadow:0 0 8px rgba(80,200,255,.5)}
+  .dgroup input[type=range]{width:120px;accent-color:#ff9b3d}
+  .dval{color:#ffd166;font-size:11px;width:34px;text-align:right}
+
+  #warn{position:fixed;inset:auto 0 0 0;padding:20px;background:#2a0d0d;color:#ffb3b3;
+        font-size:13px;line-height:1.7;border-top:2px solid #ff4d4d;display:none}
+  #warn b{color:#fff}
+  code{background:#000;padding:2px 7px;border-radius:3px;color:#ffd166}
+
+  #launcher{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
+            justify-content:center;gap:26px;background:
+            radial-gradient(120% 90% at 50% 0%,#141a34 0%,#05070d 62%);padding:44px;text-align:center}
+  #launcher h1{font-size:clamp(26px,5vw,52px);letter-spacing:.42em;font-weight:900;
+      color:#ff9b3d;text-shadow:0 0 40px rgba(242,96,13,.5);text-indent:.42em}
+  #launcher h2{font-size:11px;letter-spacing:.55em;color:#5f7a92;font-weight:400;text-indent:.55em}
+  #launcher p{color:#93a6bd;font-size:13px;line-height:2;max-width:640px}
+  #launcher button{font:inherit;font-size:14px;letter-spacing:.2em;padding:17px 34px;border:0;
+      border-radius:2px;cursor:pointer;font-weight:700;background:#f2600d;color:#12080a;
+      transition:background .15s}
+  #launcher button:hover{background:#ff9b3d}
+  #launcher button:focus-visible{outline:3px solid #8fe6ff;outline-offset:4px}
+  #launcher .alt{background:#152436;color:#8fe6ff}
+  #launcher .alt:hover{background:#1e3350}
+  #launcher .links{display:flex;flex-direction:column;gap:4px}
+  #launcher .links a{color:#8fe6ff;font-size:13px;padding:6px 10px;text-decoration:none;
+      border:1px solid rgba(143,230,255,.22);border-radius:2px}
+  #launcher .links a:hover{background:rgba(143,230,255,.1)}
+  #launcher .note{color:#54677d;font-size:11px;letter-spacing:.12em}
+  @media (prefers-reduced-motion: reduce){#launcher button{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="panelTag"></div>
+<div id="dashboard" class="hidden">
+  <div class="dgroup">
+    <span class="dlabel">RUNNER</span>
+    <input type="range" id="runnerSpeed" min="0" max="100" value="78">
+    <span class="dval" id="runnerSpeedVal">78%</span>
+  </div>
+  <div class="dgroup">
+    <span class="dlabel">CRUISER</span>
+    <input type="range" id="chaserSpeed" min="0" max="100" value="78">
+    <span class="dval" id="chaserSpeedVal">78%</span>
+  </div>
+</div>
+<div id="warn"></div>
+<div id="launcher"></div>
+<script>
+(() => {
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════
+   SCREENRIG II — one continuous world across N monitors.
+
+   ARCHITECTURE
+     · One window is HOST: it alone runs physics and broadcasts state.
+     · Every other window is a renderer that extrapolates to its own vsync.
+     · The TRACK is generated deterministically from (seed, screen widths),
+       so nothing about the world is ever transmitted — only the two cars
+       and which props are still standing.
+     · The bezel between panels is REAL WORLD SPACE. Every seam has a ramp
+       on one side and a landing on the other; the cars are genuinely
+       airborne behind your plastic.
+     · Everything renders at 1:1 world scale — no parallax. Parallax models
+       a moving camera; these cameras are static and simultaneously visible,
+       so any layer at ≠1.0 tears at the seams. Depth comes from haze.
+       The dividend: light is world-space, so the cruiser's light bar
+       spills across monitor boundaries onto other windows' terrain.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const Q     = new URLSearchParams(location.search);
+const ME    = Math.max(0, parseInt(Q.get("screen") ?? "0", 10) || 0);
+const OF    = Math.max(1, parseInt(Q.get("of")     ?? "1", 10) || 1);
+const BEZEL = parseFloat(Q.get("bezel") ?? "58");
+const SEED  = parseInt(Q.get("seed") ?? "77", 10) || 77;
+const nowMs = () => performance.timeOrigin + performance.now();
+
+/* ─────────────────────────── launcher ─────────────────────────── */
+if (!Q.has("screen")){
+  const L = document.getElementById("launcher");
+  L.style.display = "flex";
+  L.innerHTML = `
+    <h1>SCREENRIG</h1>
+    <h2>BACKROAD PURSUIT</h2>
+    <p>One road, stretched across every monitor you own. Each panel renders its own
+       slice of the same world; one of them runs the physics for all of them.
+       Every seam is a jump.</p>
+    <button id="go">DETECT SCREENS &amp; LAUNCH</button>
+    <button id="manual" class="alt">PICK A COUNT MANUALLY</button>
+    <div class="links" id="links"></div>
+    <p class="note">Serve over http://localhost — file:// windows are origin-isolated and cannot sync.</p>`;
+
+  const links = document.getElementById("links");
+  const url = (i,n) => `${location.pathname}?screen=${i}&of=${n}&bezel=${BEZEL}&seed=${SEED}`;
+
+  document.getElementById("go").onclick = async () => {
+    let screens = null;
+    try { screens = (await window.getScreenDetails()).screens; } catch(e){ screens = null; }
+    if (!screens || !screens.length){
+      links.innerHTML = `<a>Screen enumeration unavailable — Chrome wants the Window Management
+         permission on a secure origin. Use the manual option.</a>`;
+      return;
+    }
+    const s = [...screens].sort((a,b)=> a.left - b.left);
+    s.forEach((sc,i) => setTimeout(() => window.open(url(i, s.length), "rig"+i,
+      `left=${sc.availLeft},top=${sc.availTop},width=${sc.availWidth},height=${sc.availHeight},popup=yes`), i*320));
+    links.innerHTML = `<a>${s.length} screens launched — click each window and press F.</a>`;
+  };
+  document.getElementById("manual").onclick = () => {
+    const n = Math.max(1, Math.min(8, parseInt(prompt("How many screens?", "4") || "4", 10)));
+    links.innerHTML = "";
+    for (let i=0;i<n;i++){
+      const a = document.createElement("a");
+      a.href = url(i,n); a.target = "rig"+i;
+      a.textContent = `▸  open panel ${i+1} of ${n}`;
+      links.appendChild(a);
+    }
+  };
+  return;
+}
+
+document.getElementById("panelTag").textContent = `${ME+1} / ${OF}`;
+
+/* ─────────────────────────── bus ─────────────────────────── */
+let bus = null, busOK = false;
+try { bus = new BroadcastChannel("screenrig2"); busOK = true; } catch(e){}
+const send = m => { if (bus) try { bus.postMessage(m); } catch(e){} };
+
+/* ─────────────────────────── speed dashboard ─────────────────────────── */
+// Slider 0-100 maps to a speed multiplier over tonight's tuned baseline. 78 sits
+// right on that baseline (1x) with real headroom below (slow-motion) and a modest
+// faster ceiling above — not a return to the original chaos, just breathing room.
+let runnerMult = 1, chaserMult = 1, chaserBand = 1;
+const mapSpeedPct = v => v <= 78 ? 0.15 + (v/78)*0.85 : 1 + ((v-78)/22)*0.8;
+const invMapSpeedPct = m => m <= 1 ? ((m-0.15)/0.85)*78 : 78 + ((m-1)/0.8)*22;
+
+const dashboardEl = document.getElementById("dashboard");
+dashboardEl.classList.remove("hidden");
+function wireSpeedSlider(id, valId, who){
+  const el = document.getElementById(id), valEl = document.getElementById(valId);
+  el.oninput = () => {
+    const mult = mapSpeedPct(Number(el.value));
+    valEl.textContent = Math.round(mult*100) + "%";
+    if (who === "runner") runnerMult = mult; else chaserMult = mult;
+    send({t:"cmd", k:"speed", who, mult});
+  };
+}
+wireSpeedSlider("runnerSpeed", "runnerSpeedVal", "runner");
+wireSpeedSlider("chaserSpeed", "chaserSpeedVal", "chaser");
+function syncSpeedUI(){
+  const rv = document.getElementById("runnerSpeed"), cv2 = document.getElementById("chaserSpeed");
+  rv.value = invMapSpeedPct(runnerMult); document.getElementById("runnerSpeedVal").textContent = Math.round(runnerMult*100) + "%";
+  cv2.value = invMapSpeedPct(chaserMult); document.getElementById("chaserSpeedVal").textContent = Math.round(chaserMult*100) + "%";
+}
+
+/* ─────────────────────────── canvas ─────────────────────────── */
+const cv = document.getElementById("c"), ctx = cv.getContext("2d", {alpha:false});
+let VW = 0, VH = 0, dpr = 1;
+function resize(){
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  VW = innerWidth; VH = innerHeight;
+  cv.width = Math.round(VW*dpr); cv.height = Math.round(VH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  announce();
+}
+addEventListener("resize", resize);
+
+/* ─────────────────────────── layout ─────────────────────────── */
+let widths = new Array(OF).fill(0), offsets = new Array(OF).fill(0);
+let worldW = 0, baseY = 0;
+function recomputeLayout(){
+  let acc = 0;
+  for (let i=0;i<OF;i++){ offsets[i] = acc; acc += (widths[i] || VW) + BEZEL; }
+  worldW = acc - BEZEL;
+  // Proportional, not a fixed 190px — a fixed offset leaves a disproportionate dark dirt
+  // band on any window that's taller than the others (mismatched monitor resolutions).
+  baseY  = VH * 0.70;
+  buildTrack();
+}
+function announce(){ widths[ME] = VW; send({t:"hello", i:ME, w:VW, h:VH}); recomputeLayout(); }
+
+/* ─────────────────────────── deterministic noise ─────────────────────────── */
+function rng32(a){ return function(){ a|=0; a = a+0x6D2B79F5|0;
+  let t = Math.imul(a ^ a>>>15, 1|a); t = t + Math.imul(t ^ t>>>7, 61|t) ^ t;
+  return ((t ^ t>>>14)>>>0) / 4294967296; }; }
+const smooth = t => t*t*(3-2*t);
+
+/* ═══════════════════════ THE TRACK ═══════════════════════
+   Authored, not noise. A cursor walks the world emitting shaped
+   segments. Each panel gets an "act"; every seam gets a kicker on
+   the near side and a graded landing on the far side.            */
+const STEP = 14;
+let HF = [];              // {x,y,pit} sampled heightfield
+let decor = [], props = [], ridges = [], stars = [], moon = null, gaps = [];
+
+function buildTrack(){
+  HF = []; decor = []; props = []; gaps = [];
+  const start = -520;
+  let cx = start, cy = baseY;
+
+  const emit = (len, fn, pit=false) => {
+    if (len <= 0) return;
+    const n = Math.max(2, Math.round(len/STEP));
+    for (let i=1;i<=n;i++){
+      const t = i/n;
+      HF.push({x: cx + len*t, y: pit ? baseY + 1400 : cy + fn(t), pit});
+    }
+    cy += fn(1); cx += len;
+  };
+  const flat    = len          => emit(len, () => 0);
+  const roll    = (len,a,n)    => emit(len, t => -a*Math.sin(t*Math.PI*2*n));
+  const whoops  = (len,n,a)    => emit(len, t => -a*(1-Math.cos(t*Math.PI*2*n))/2);
+  const climb   = (len,h)      => emit(len, t => -h*smooth(t));
+  const fall    = (len,h)      => emit(len, t =>  h*smooth(t));
+  const kicker  = (len,h)      => emit(len, t => -h*Math.pow(t,1.85));
+  const gap     = (len)        => emit(len, () => 0, true);
+  const fillTo  = (x, a=0, n=1)=> { const L = x - cx; if (L > STEP) (a ? roll(L,a,n) : flat(L)); };
+
+  HF.push({x:start, y:baseY, pit:false});
+
+  for (let i=0;i<OF;i++){
+    const w = widths[i] || VW, o = offsets[i];
+    const act = i % 4;
+
+    // ── landing apron: shorter than it was — cars were sailing deep into the next
+    // panel before touching down. Still forgiving, just not a quarter of the screen.
+    if (i > 0){ fall(40, 28); fillTo(o + w*0.10, 8, 1); }
+    else       { flat(360); fillTo(o + w*0.10); }
+
+    // ── this panel's set piece
+    if (act === 0){                                  // washboard
+      whoops(w*0.30, 4, 30);
+      fillTo(o + w*0.56);
+      climb(w*0.10, 46); fall(w*0.10, 46);
+    } else if (act === 1){                            // mesa with a barn on top
+      climb(w*0.12, 96);
+      const top = cx; flat(w*0.20);
+      decor.push({k:"barn", x:(top + cx)/2, y:cy, s:1});
+      fall(w*0.12, 96);
+      fillTo(o + w*0.72);
+    } else if (act === 2){                            // creek bowl
+      fall(w*0.13, 88); flat(w*0.12);
+      decor.push({k:"water", x:cx - w*0.06, y:cy, w:w*0.12});
+      climb(w*0.15, 88);
+      fillTo(o + w*0.74, 16, 1);
+    } else {                                          // rollers + water tower
+      roll(w*0.34, 44, 2);
+      decor.push({k:"tower", x:o + w*0.60, y:0});
+      fillTo(o + w*0.74);
+    }
+
+    // ── run-up, kicker, and the jump across the plastic
+    const rampL = Math.min(200, w*0.15);
+    fillTo(o + w - rampL - 24);
+    if (i < OF - 1){
+      const lipX = cx + rampL;
+      kicker(rampL, 104);
+      const yAtLift = cy;                                  // height AFTER the climb, not before
+      const gapWidth = (o + w) - lipX + BEZEL + 20;
+      const sign = {k:"sign", x:lipX - rampL*0.55, y:cy + 30};
+      decor.push(sign);
+      // liftX/yAtLift anchor a post-build numeric search (see below) that measures the real
+      // heightfield instead of assuming one — the actual landing terrain varies by act/bezel.
+      gaps.push({liftX: lipX, yAtLift, sign});
+      gap(gapWidth);
+    } else {
+      kicker(rampL, 78);
+      fall(w*0.06, 78); flat(700);
+    }
+  }
+
+  // ── MPR — Minimum Physics Required: binary-search, running the REAL driveCar physics
+  // (same gravity, same airborne thrust, same AI landing-angle assist) against the
+  // now-complete heightfield, for the lowest launch speed that lands without falling short
+  // or hitting the far slope at a wreck-triggering angle. A hand-derived ballistic formula
+  // undercounted this badly — real flight keeps accelerating and self-levels; measuring
+  // against the actual simulation is the only way to get a number the clearance assist can
+  // trust. MightyTag names how much that asks of the car.
+  for (const gp of gaps){
+    // slopeAt samples ±11px; stay clear of the pit boundary at liftX or it reads a false cliff.
+    const angAtLift = slopeAt(gp.liftX - 15);   // the kicker launches nose-up, not level
+    const settles = vx => {
+      const t = {x:gp.liftX, y:gp.yAtLift, vx, vy:0, ang:angAtLift, angV:0, onGround:false, crash:0,
+                 boost:0, wheelSpin:0, kind:"runner", R:19, darkSide:null,
+                 relight:0, jumpFloor:vx, topEnd:vx};
+      const ctrl = {gas:true, brake:false, flipF:false, flipB:false, level:true};
+      for (let i=0; i<3000; i++){
+        driveCar(t, 1/240, ctrl);
+        if (t.crash > 0) return false;
+        if (t.onGround) return true;
+        if (t.y > baseY + 900) return false;
+      }
+      return false;
+    };
+    let lo = 150, hi = 2400;
+    for (let iter=0; iter<26; iter++){
+      const mid = (lo+hi)/2;
+      if (settles(mid)) hi = mid; else lo = mid;
+    }
+    // The search finds the razor-thin exact minimum against an idealized, collision-free
+    // approach. Real gameplay varies (bumper taps, off-center timing), so carry a margin —
+    // a rubber-banding chaser bumping the runner mid-approach shouldn't turn into a wreck.
+    gp.mpr = Math.ceil(hi * 1.35);
+    gp.sign.tag = gp.mpr > 900 ? "STRETCH" : gp.mpr > 500 ? "REACH" : "GRACE";
+  }
+
+  // ── scenery + props, seeded per panel so every window agrees exactly
+  for (let i=0;i<OF;i++){
+    const w = widths[i] || VW, o = offsets[i], r = rng32(SEED*7919 + i*104729);
+    for (let k=0;k<9;k++){
+      const x = o + r()*w, g = groundAt(x);
+      if (g > baseY + 400) continue;
+      decor.push({k: r() < .62 ? "pine" : "post", x, y:g, s: .7 + r()*.7});
+    }
+    for (let k=0;k<6;k++){
+      const x = o + 90 + r()*(w-180), g = groundAt(x);
+      if (g > baseY + 400) continue;
+      if (Math.abs(slopeAt(x)) > 0.34) continue;
+      props.push({x, y:g, screen:i, kind: r() < .5 ? "barrel" : "hay", r:21, alive:true});
+    }
+  }
+
+  // ── static sky. World coordinates, so it spans every panel exactly once.
+  const sr = rng32(SEED ^ 0xBEEF);
+  stars = [];
+  for (let k=0;k<420;k++) stars.push({x: sr()*(worldW+800)-400, y: sr()*VH*0.62, a: .18+sr()*.75, s: sr()<.08?2:1});
+  moon = {x: worldW*0.17, y: VH*0.15, r: 46};
+
+  ridges = [];
+  const layers = [
+    {h:0.34, col:"#101a2e", jag:0.55, step:150},
+    {h:0.24, col:"#16233c", jag:0.85, step:110},
+    {h:0.15, col:"#1c2b46", jag:1.25, step:80},
+  ];
+  layers.forEach((L, li) => {
+    const r = rng32(SEED + li*3571), pts = [];
+    for (let x=-500; x<worldW+600; x+=L.step)
+      pts.push({x, y: baseY - VH*L.h*(0.62 + r()*0.55*L.jag)});
+    ridges.push({pts, col:L.col});
+  });
+}
+
+function groundAt(x){
+  if (!HF.length) return baseY;
+  if (x <= HF[0].x || x >= HF[HF.length-1].x) return baseY;
+  // Binary search by actual x, not index arithmetic — each segment's real sample
+  // spacing only approximates STEP (it's len/round(len/STEP) per segment), and that
+  // drift compounds over a long track until a straight division picks the wrong pair
+  // of points entirely. Exact bracketing matters most right at a gap's pit edge.
+  let lo = 0, hi = HF.length - 1;
+  while (hi - lo > 1){
+    const mid = (lo + hi) >> 1;
+    if (HF[mid].x <= x) lo = mid; else hi = mid;
+  }
+  const a = HF[lo], b = HF[hi];
+  if (a.pit || b.pit) return baseY + 1400;
+  const t = Math.max(0, Math.min(1, (x - a.x)/(b.x - a.x || STEP)));
+  return a.y + (b.y - a.y)*t;
+}
+const slopeAt = x => Math.atan2(groundAt(x+11) - groundAt(x-11), 22);
+
+/* ═══════════════════════ VEHICLES ═══════════════════════ */
+// Higher gravity than a real car (still shy of the old 2150 *2 fix) so ordinary
+// whoops/rolls settle the wheels back down quickly instead of skipping — cars hug
+// the terrain at drive speed. Gaps still need real air time; the MPR search below
+// re-measures against this exact G, so gap difficulty rebalances itself automatically.
+const G = 2650;
+// DRIVE speed — cartoony-believable cruising, tuned tonight, scaled live by the
+// dashboard sliders (runnerMult/chaserMult). Crossing a gap needs BOOST speed,
+// forced on approach by the jumpFloor/MPR system below regardless of slider
+// position — the contrast between the two is the "slingshot" moment.
+const BASE = {cruiser: {power:50, topEnd:60}, runner: {power:47, topEnd:63}};
+function mkCar(kind, x){
+  return {kind, x, y:0, vx:0, vy:0, ang:0, angV:0, onGround:false, crash:0,
+          boost:0, wheelSpin:0, darkSide:null, relight:0, jumpFloor:0, R:19};
+}
+let runner = mkCar("runner", 300), chaser = mkCar("cruiser", -160);
+let scores = new Array(OF).fill(0);
+let laps = 0;
+
+function driveCar(c, dt, ctrl){
+  if (c.relight > 0){ c.relight -= dt; if (c.relight <= 0) c.darkSide = null; }
+  if (c.crash > 0){
+    c.crash -= dt;
+    c.angV *= 0.95; c.ang += c.angV*dt;
+    c.vx *= 0.91; c.vy += G*dt;
+    c.x += c.vx*dt; c.y += c.vy*dt;
+    const g = groundAt(c.x);
+    if (c.y > g - c.R){ c.y = g - c.R; c.vy *= -0.26; c.vx *= 0.72; }
+    if (c.crash <= 0){ c.ang = slopeAt(c.x); c.angV = 0; c.vx = Math.max(c.vx, 300); }
+    return;
+  }
+
+  // Dashboard sliders scale power/topEnd live. topEnd stays overridable (the MPR
+  // search below passes its own fixed topEnd on a synthetic car) so slider position
+  // never contaminates the gap-clearance math — that has to stay slider-independent.
+  const mult = c.kind === "cruiser" ? chaserMult : runnerMult;
+  const P = BASE[c.kind].power * mult;
+  const T = c.topEnd !== undefined ? c.topEnd : BASE[c.kind].topEnd * mult * (c.kind === "cruiser" ? chaserBand : 1);
+
+  if (c.onGround){
+    if (ctrl.gas)   c.vx += P*dt;
+    if (ctrl.brake) c.vx -= 1600*dt;
+    c.vx *= (1 - 0.5*dt);
+    c.wheelSpin += c.vx*dt*0.06;
+  } else {
+    if (ctrl.gas) c.vx += 16*dt;
+    if (ctrl.flipF) c.angV += 7.2*dt;
+    if (ctrl.flipB) c.angV -= 7.2*dt;
+    if (ctrl.level){                              // AI (and demo) landing assist
+      const eta = Math.max(0.05, (groundAt(c.x + c.vx*0.35) - c.y)/Math.max(c.vy,120));
+      const want = slopeAt(c.x + c.vx*eta);
+      let d = ((want - c.ang + Math.PI) % (Math.PI*2)) - Math.PI;
+      c.angV += Math.max(-9, Math.min(9, d*7)) * dt * 2.4;
+    }
+    c.angV *= (1 - 0.3*dt);
+  }
+  c.vx = Math.max(-33, Math.min(T + c.boost, c.vx));
+  // MPR clearance assist — read the next gap's MightyTag and floor vx to its MPR on approach,
+  // even past topEnd if the gap demands it. jumpFloor persists through the whole flight —
+  // without it the topEnd clamp above claws the boost back down on the very next airborne
+  // frame, defeating the point. It clears once grounded again past the gap.
+  if (c.onGround){
+    const upcoming = gaps.find(gp => gp.liftX > c.x);
+    const wasJumping = c.jumpFloor > 0;
+    c.jumpFloor = (upcoming && upcoming.liftX - c.x < 260) ? upcoming.mpr : 0;
+    // A gap speed is only meant to clear that one gap — shed it the instant we're safely
+    // down, or the car carries jump-speed into ordinary terrain tuned for normal cruising
+    // and catches unintended air off the next small bump.
+    if (wasJumping && !c.jumpFloor) c.vx = Math.min(c.vx, T + c.boost);
+  }
+  if (c.jumpFloor) c.vx = Math.max(c.vx, c.jumpFloor);
+  c.vy += G*dt;
+  c.x += c.vx*dt; c.y += c.vy*dt; c.ang += c.angV*dt;
+  if (c.boost > 0) c.boost -= 300*dt;
+
+  const g = groundAt(c.x);
+  if (c.y >= g - c.R){
+    const sl = slopeAt(c.x);
+    if (!c.onGround){
+      let d = ((c.ang - sl + Math.PI) % (Math.PI*2)) - Math.PI;
+      if (Math.abs(d) > 1.2 && c.vy > 520){
+        c.crash = 1.4; c.angV = (d>0?1:-1)*9.5; c.vy = -430;
+        fxEvent("wreck", c.x, c.y, c.kind);
+        if (c.kind === "cruiser"){ c.darkSide = Math.random() < 0.5 ? 0 : 1; c.relight = 5; }
+        return;
+      }
+      fxEvent("land", c.x, g, c.kind);
+    }
+    c.y = g - c.R; c.onGround = true; c.vy = Math.min(c.vy, 0);
+    c.ang += (sl - c.ang) * Math.min(1, 17*dt);
+    c.angV = 0;
+  } else c.onGround = false;
+
+  if (c.y > VH + 900){                                    // fell in the creek
+    c.x += 300; c.y = groundAt(c.x) - 400; c.vy = 0; c.vx = 420; c.ang = 0;
+    fxEvent("splash", c.x, baseY, c.kind);
+  }
+}
+
+/* ── pursuit AI: rubber-banded so both cars stay on the rig ── */
+function chaserCtrl(){
+  const gapPx = runner.x - chaser.x;
+  const want  = 165;
+  const gas   = gapPx > want*0.55 || chaser.vx < 16*chaserMult;
+  const brake = gapPx < 55 && chaser.onGround;
+  // Rubber-band as a factor, not a direct topEnd write — driveCar layers this on top
+  // of BASE*chaserMult so the slider and the AI's own pacing don't fight each other.
+  chaserBand = Math.max(0.82, Math.min(1.42, 1 + (gapPx - want)/1000));
+  return {gas, brake, flipF:false, flipB:false, level:true};
+}
+let demo = true;
+const keys = {};
+function runnerCtrl(){
+  if (demo){
+    const airborne = !runner.onGround;
+    return {gas:true, brake:false,
+            flipF: airborne && runner.vy < -520 && Math.abs(runner.angV) < .4,
+            flipB:false, level: !airborne || runner.vy > 40};
+  }
+  return {gas: !!(keys.right||keys.d), brake: !!(keys.left||keys.a),
+          flipF: !!(keys.up||keys.w), flipB: !!(keys.down||keys.s), level:false};
+}
+
+/* ═══════════════════════ SIM (host only) ═══════════════════════ */
+function simulate(dt){
+  driveCar(runner, dt, runnerCtrl());
+  driveCar(chaser, dt, chaserCtrl());
+
+  // car-on-car — magnetic, not collisional: a continuous soft pull toward an ideal
+  // following gap instead of a hard bump-and-bounce. Too far apart, they drift together;
+  // too close, they ease apart; never a sudden stop. A real touch still sparks, just rarely.
+  const dx = chaser.x - runner.x, dy = chaser.y - runner.y;
+  const d = Math.hypot(dx, dy);
+  // Grounded only — nudging x mid-flight would throw off the MPR jump math, which
+  // depends on precise position/velocity while airborne. Also off entirely near an
+  // upcoming gap (either car) — a positional tug right as a car needs to hit exact
+  // MPR speed for takeoff was jamming both cars in a stuck oscillation at the gap.
+  const MAGNET_BREAK = 150;                // looser: breaks apart sooner than before
+  const nearGap = c => { const gp = gaps.find(g => g.liftX > c.x); return gp && gp.liftX - c.x < 300; };
+  if (d > 0.01 && d < MAGNET_BREAK && runner.onGround && chaser.onGround
+      && !nearGap(runner) && !nearGap(chaser)){
+    const nx = dx/d, idealGap = 70;
+    const pull = Math.max(-1, Math.min(1, (d - idealGap)/90)) * 18 * dt;
+    runner.x += nx*pull; chaser.x -= nx*pull;
+    if (d < 22) fxEvent("bump", (runner.x+chaser.x)/2, (runner.y+chaser.y)/2);
+  }
+
+  for (const p of props){
+    if (!p.alive) continue;
+    for (const c of [runner, chaser]){
+      if (Math.hypot(c.x-p.x, c.y-(p.y-p.r)) < c.R + p.r){
+        p.alive = false; scores[p.screen]++; c.vx *= 0.93;
+        fxEvent("smash", p.x, p.y - p.r, p.kind);
+        break;
+      }
+    }
+  }
+
+  // lap: shift the whole pursuit back, preserving the chase
+  if (runner.x > worldW + 200){
+    const shift = worldW + 380;
+    runner.x -= shift; chaser.x -= shift; laps++;
+    props.forEach(p => p.alive = true);
+  }
+  if (chaser.x < -1400) chaser.x = runner.x - 700;
+}
+
+/* ═══════════════════════ EFFECTS (local per window) ═══════════════════════ */
+let parts = [], decals = [], flash = 0, lightPulse = 0;
+function fxEvent(kind, x, y, tag){ send({t:"fx", kind, x, y, tag}); applyFx({kind,x,y,tag}); }
+function applyFx(m){
+  const B = (n, col, spd, up) => {
+    for (let i=0;i<n;i++) parts.push({x:m.x, y:m.y,
+      vx:(Math.random()-.5)*spd, vy:-Math.random()*up, life:.45+Math.random()*.75, t:0, col,
+      sz: 2+Math.random()*3});
+  };
+  if (m.kind === "smash"){ B(24, "#ffd166", 420, 330); flash = Math.max(flash,.34);
+                           decals.push({x:m.x, y:m.y, t:0, kind:"scorch"}); }
+  if (m.kind === "wreck"){ B(34, m.tag==="cruiser"?"#8fe6ff":"#ff7a1a", 520, 400); flash = Math.max(flash,.5); }
+  if (m.kind === "land") { B(14, "#b9a27f", 260, 150);
+                           decals.push({x:m.x, y:m.y, t:0, kind:"skid"}); }
+  if (m.kind === "bump") { B(16, "#ffffff", 340, 240); flash = Math.max(flash,.22); }
+  if (m.kind === "splash"){ B(30, "#5fd8ff", 380, 420); }
+  if (decals.length > 260) decals.splice(0, decals.length-260);
+}
+function stepFx(dt){
+  for (let i=parts.length-1;i>=0;i--){
+    const p = parts[i]; p.t += dt;
+    p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 950*dt; p.vx *= .99;
+    if (p.t > p.life) parts.splice(i,1);
+  }
+  for (let i=decals.length-1;i>=0;i--){ decals[i].t += dt; if (decals[i].t > 9) decals.splice(i,1); }
+  if (flash > 0) flash -= dt*2.1;
+  lightPulse += dt;
+}
+
+/* ═══════════════════════ NET ═══════════════════════ */
+let isHost = (ME === 0), lastBeat = nowMs(), net = {rx:0, drift:0, lastRx:0};
+const pack = c => ({x:c.x,y:c.y,vx:c.vx,vy:c.vy,ang:c.ang,angV:c.angV,
+                    onGround:c.onGround,crash:c.crash,wheelSpin:c.wheelSpin});
+function sendState(){
+  send({t:"state", ts:nowMs(), r:pack(runner), c:pack(chaser),
+        p:props.map(p=>p.alive?1:0), s:scores, d:demo, l:laps, rm:runnerMult, cm:chaserMult});
+}
+if (busOK) bus.onmessage = ev => {
+  const m = ev.data;
+  if (m.t === "hello"){
+    if (m.i !== ME && widths[m.i] !== m.w){ widths[m.i] = m.w; recomputeLayout(); }
+    if (isHost) sendState();
+  } else if (m.t === "state"){
+    lastBeat = nowMs();
+    if (!isHost){
+      net.rx++; const t = nowMs(); net.drift = t - m.ts; net.lastRx = t;
+      Object.assign(runner, m.r); Object.assign(chaser, m.c);
+      if (m.p.length === props.length) props.forEach((p,i)=> p.alive = !!m.p[i]);
+      scores = m.s; demo = m.d; laps = m.l;
+      if (m.rm !== undefined && m.rm !== runnerMult){ runnerMult = m.rm; syncSpeedUI(); }
+      if (m.cm !== undefined && m.cm !== chaserMult){ chaserMult = m.cm; syncSpeedUI(); }
+    }
+  } else if (m.t === "fx"){ applyFx(m); }
+  else if (m.t === "input" && isHost){ keys[m.k] = m.down; }
+  else if (m.t === "cmd"){
+    if (m.k === "demo") demo = m.v;
+    if (m.k === "reset") doReset();
+    if (m.k === "speed"){ if (m.who === "runner") runnerMult = m.mult; else chaserMult = m.mult; syncSpeedUI(); }
+  }
+};
+
+function doReset(){
+  runner = mkCar("runner", 300); chaser = mkCar("cruiser", -160);
+  runner.y = groundAt(runner.x) - runner.R; chaser.y = groundAt(chaser.x) - chaser.R;
+  props.forEach(p => p.alive = true);
+  scores = new Array(OF).fill(0); laps = 0;
+  parts = []; decals = [];
+}
+
+/* ═══════════════════════ INPUT ═══════════════════════ */
+const MAP = {arrowleft:"left",arrowright:"right",arrowup:"up",arrowdown:"down",
+             a:"a",d:"d",w:"w",s:"s"};
+addEventListener("keydown", e => {
+  const k = MAP[e.key.toLowerCase()];
+  if (k){ e.preventDefault();
+          if (demo){ demo = false; send({t:"cmd",k:"demo",v:false}); }
+          if (isHost) keys[k] = true; else send({t:"input", k, down:true}); }
+  switch (e.key.toLowerCase()){
+    case "f": document.fullscreenElement ? document.exitFullscreen?.() : document.documentElement.requestFullscreen?.(); break;
+    case "r": send({t:"cmd",k:"reset"}); doReset(); break;
+    case "0": demo = !demo; send({t:"cmd",k:"demo",v:demo}); break;
+    case "h": hudOn = !hudOn; dashboardEl.classList.toggle("hidden", !hudOn); break;
+    case "m": toggleAudio(); break;
+  }
+});
+addEventListener("keyup", e => {
+  const k = MAP[e.key.toLowerCase()];
+  if (k){ if (isHost) keys[k] = false; else send({t:"input", k, down:false}); }
+});
+let hudOn = true;
+
+/* ═══════════════════════ AUDIO (opt-in, spatial across the rig) ═══════════
+   Each window's gain tracks how close the cars are to ITS panel, so with
+   speakers on more than one monitor the engine physically travels the desk. */
+let AC = null, engine = null, siren = null, audioOn = false;
+function toggleAudio(){
+  if (!audioOn){
+    try {
+      AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+      AC.resume();
+      const mk = (type, freq, q) => {
+        const o = AC.createOscillator(), f = AC.createBiquadFilter(), g = AC.createGain();
+        o.type = type; o.frequency.value = freq; f.type = "lowpass"; f.frequency.value = q;
+        g.gain.value = 0; o.connect(f); f.connect(g); g.connect(AC.destination); o.start();
+        return {o,f,g};
+      };
+      engine = mk("sawtooth", 60, 700);
+      siren  = mk("triangle", 640, 2400);
+      audioOn = true;
+    } catch(e){ audioOn = false; }
+  } else {
+    audioOn = false;
+    if (engine) engine.g.gain.value = 0;
+    if (siren)  siren.g.gain.value  = 0;
+  }
+}
+function audioTick(){
+  if (!audioOn || !AC) return;
+  const off = offsets[ME] || 0, mid = off + VW/2;
+  const near = c => Math.max(0, 1 - Math.abs(c.x - mid) / (VW*0.9));
+  const er = near(runner), ec = near(chaser);
+  const spd = Math.abs(runner.vx);
+  engine.o.frequency.value = 48 + spd*0.085;
+  engine.f.frequency.value = 380 + spd*0.5;
+  engine.g.gain.value = 0.055 * er * (runner.onGround ? 1 : .55);
+  siren.o.frequency.value = 560 + Math.sin(lightPulse*7)*190;
+  siren.g.gain.value = 0.03 * ec;
+}
+
+/* ═══════════════════════ RENDER ═══════════════════════ */
+function lightPool(x, y, r, col, a){
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, col.replace("ALPHA", a));
+  g.addColorStop(1, col.replace("ALPHA", 0));
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+}
+
+function drawHeadlamps(c, positions){
+  // c.darkSide (0=first lamp, 1=second, null=both lit) lets a crash knock one out temporarily.
+  positions.forEach(([hx, hy], i) => {
+    const lit = c.darkSide !== i;
+    ctx.beginPath(); ctx.arc(hx, hy, 2.8, 0, 7);
+    ctx.fillStyle = lit ? "#fff6d8" : "#4a3a28";
+    ctx.fill();
+    ctx.strokeStyle = "#5a3d12"; ctx.lineWidth = 1; ctx.stroke();
+    if (lit){ ctx.beginPath(); ctx.arc(hx+0.8, hy-0.8, 0.9, 0, 7); ctx.fillStyle = "#ffffff"; ctx.fill(); }
+  });
+}
+function drawRunner(c){
+  ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.ang); ctx.scale(0.75, 0.75);
+  const g = ctx.createLinearGradient(0,-28,0,18);
+  g.addColorStop(0,"#ffab4d"); g.addColorStop(.48,"#ee5c0b"); g.addColorStop(1,"#8e2f07");
+  ctx.fillStyle = g; ctx.strokeStyle = "#3a1305"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-48,8); ctx.lineTo(-45,-7); ctx.lineTo(-18,-11); ctx.lineTo(-9,-29);
+  ctx.lineTo(17,-29); ctx.lineTo(28,-9); ctx.lineTo(48,-5); ctx.lineTo(50,8); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#0f1c28";
+  ctx.beginPath(); ctx.moveTo(-8,-26); ctx.lineTo(16,-26); ctx.lineTo(24,-12); ctx.lineTo(-15,-12); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#2c0f05"; ctx.fillRect(-48,1,98,3);
+  // door number — mid-70s stock-car style, painted straight onto the panel
+  ctx.fillStyle = "#f7ecd9"; ctx.strokeStyle = "#2c0f05"; ctx.lineWidth = 2.4;
+  ctx.font = "900 14px Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.strokeText("01", 4, -5); ctx.fillText("01", 4, -5);
+  // headlamps — dual round sealed-beam units on the front fender, clear of the wheel arch
+  drawHeadlamps(c, [[36,-6],[42,-4]]);
+  wheels(c, -30, 32);
+  ctx.restore();
+}
+function drawCruiser(c){
+  ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.ang); ctx.scale(0.75, 0.75);
+  ctx.fillStyle = "#e9edf4"; ctx.strokeStyle = "#141820"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-50,8); ctx.lineTo(-47,-7); ctx.lineTo(-20,-11); ctx.lineTo(-10,-29);
+  ctx.lineTo(18,-29); ctx.lineTo(29,-9); ctx.lineTo(50,-5); ctx.lineTo(52,8); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#161c26";                       // door panel
+  ctx.beginPath(); ctx.moveTo(-30,-8); ctx.lineTo(24,-8); ctx.lineTo(26,6); ctx.lineTo(-32,6); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#0f1c28";
+  ctx.beginPath(); ctx.moveTo(-9,-26); ctx.lineTo(17,-26); ctx.lineTo(25,-12); ctx.lineTo(-16,-12); ctx.closePath(); ctx.fill();
+  // light bar
+  const phase = Math.sin(lightPulse*9) > 0;
+  ctx.fillStyle = "#22262f"; ctx.fillRect(-13,-37,27,8);
+  ctx.fillStyle = phase ? "#ff3b3b" : "#3a1414"; ctx.fillRect(-12,-36,12,6);
+  ctx.fillStyle = phase ? "#20406b" : "#3b8cff"; ctx.fillRect(1,-36,12,6);
+  // headlamps — same fixture as the runner; darkSide/relight (set on a wreck) can black one out
+  drawHeadlamps(c, [[36,-6],[42,-4]]);
+  wheels(c, -32, 33);
+  ctx.restore();
+}
+function wheels(c, x1, x2){
+  ctx.fillStyle = "#0a0b0f";
+  for (const wx of [x1, x2]){
+    ctx.beginPath(); ctx.arc(wx, 11, 14, 0, 7); ctx.fill();
+    ctx.save(); ctx.translate(wx, 11); ctx.rotate(c.wheelSpin);
+    ctx.strokeStyle = "#7f8592"; ctx.lineWidth = 2.6;
+    for (let s=0;s<3;s++){ ctx.rotate(Math.PI/3);
+      ctx.beginPath(); ctx.moveTo(-7,0); ctx.lineTo(7,0); ctx.stroke(); }
+    ctx.restore();
+  }
+}
+
+function render(dt){
+  const off = offsets[ME] || 0, L = off - 140, R = off + VW + 140;
+
+  const sky = ctx.createLinearGradient(0,0,0,VH);
+  sky.addColorStop(0,"#060a1c"); sky.addColorStop(.42,"#141433");
+  sky.addColorStop(.76,"#3a2242"); sky.addColorStop(1,"#5e2f2e");
+  ctx.fillStyle = sky; ctx.fillRect(0,0,VW,VH);
+
+  ctx.save();
+  ctx.translate(-off, 0);                     // ← the only transform. 1:1 world space.
+
+  for (const s of stars){
+    if (s.x < L || s.x > R) continue;
+    ctx.globalAlpha = s.a; ctx.fillStyle = "#dfe8ff";
+    ctx.fillRect(s.x, s.y, s.s, s.s);
+  }
+  ctx.globalAlpha = 1;
+
+  if (moon.x > L && moon.x < R){
+    ctx.globalCompositeOperation = "lighter";
+    lightPool(moon.x, moon.y, moon.r*5, "rgba(180,205,255,ALPHA)", .16);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#e8eeff";
+    ctx.beginPath(); ctx.arc(moon.x, moon.y, moon.r, 0, 7); ctx.fill();
+    ctx.fillStyle = "rgba(150,170,215,.55)";
+    ctx.beginPath(); ctx.arc(moon.x-13, moon.y-7, 9, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(moon.x+11, moon.y+13, 6, 0, 7); ctx.fill();
+  }
+
+  for (const rg of ridges){                    // haze for depth, never parallax
+    ctx.fillStyle = rg.col;
+    ctx.beginPath(); ctx.moveTo(rg.pts[0].x, VH+40);
+    for (const p of rg.pts) if (p.x > L-400 && p.x < R+400) ctx.lineTo(p.x, p.y);
+    ctx.lineTo(rg.pts[rg.pts.length-1].x, VH+40); ctx.closePath(); ctx.fill();
+  }
+
+  // ── terrain
+  const i0 = Math.max(0, Math.floor((L - HF[0].x)/STEP));
+  const i1 = Math.min(HF.length-1, Math.ceil((R - HF[0].x)/STEP));
+  ctx.beginPath(); ctx.moveTo(HF[i0].x, VH+60);
+  for (let i=i0;i<=i1;i++) ctx.lineTo(HF[i].x, Math.min(HF[i].y, VH+400));
+  ctx.lineTo(HF[i1].x, VH+60); ctx.closePath();
+  const tg = ctx.createLinearGradient(0, baseY-300, 0, VH);
+  tg.addColorStop(0,"#453423"); tg.addColorStop(.45,"#241a11"); tg.addColorStop(1,"#0d0906");
+  ctx.fillStyle = tg; ctx.fill();
+  ctx.strokeStyle = "#a8804a"; ctx.lineWidth = 3; ctx.beginPath();
+  let pen = false;
+  for (let i=i0;i<=i1;i++){
+    const p = HF[i];
+    if (p.pit){ pen = false; continue; }
+    pen ? ctx.lineTo(p.x, p.y) : (ctx.moveTo(p.x, p.y), pen = true);
+  }
+  ctx.stroke();
+
+  // ── decor
+  for (const d of decor){
+    if (d.x < L-120 || d.x > R+120) continue;
+    ctx.save(); ctx.translate(d.x, d.k==="tower" ? groundAt(d.x) : d.y);
+    if (d.k === "pine"){
+      ctx.fillStyle = "#0b1710"; const s = d.s;
+      ctx.beginPath(); ctx.moveTo(0,-64*s); ctx.lineTo(17*s,4); ctx.lineTo(-17*s,4); ctx.closePath(); ctx.fill();
+    } else if (d.k === "post"){
+      ctx.fillStyle = "#241a11"; ctx.fillRect(-3,-34*d.s,6,34*d.s);
+      ctx.fillRect(-26,-26*d.s,52,4);
+    } else if (d.k === "barn"){
+      ctx.fillStyle = "#5b1f18"; ctx.fillRect(-62,-84,124,84);
+      ctx.beginPath(); ctx.moveTo(-70,-84); ctx.lineTo(0,-126); ctx.lineTo(70,-84); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#2a0e0a"; ctx.fillRect(-20,-52,40,52);
+      ctx.fillStyle = "#e8c07a"; ctx.fillRect(-52,-70,20,18); ctx.fillRect(32,-70,20,18);
+      ctx.globalCompositeOperation = "lighter";
+      lightPool(-42,-61, 130, "rgba(255,190,110,ALPHA)", .18);
+      lightPool( 42,-61, 130, "rgba(255,190,110,ALPHA)", .18);
+      ctx.globalCompositeOperation = "source-over";
+    } else if (d.k === "tower"){
+      ctx.strokeStyle = "#1d2733"; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(-26,0); ctx.lineTo(-13,-96); ctx.moveTo(26,0); ctx.lineTo(13,-96);
+      ctx.moveTo(-20,-46); ctx.lineTo(20,-46); ctx.stroke();
+      ctx.fillStyle = "#2b3846";
+      ctx.beginPath(); ctx.moveTo(-30,-96); ctx.lineTo(30,-96); ctx.lineTo(24,-140); ctx.lineTo(-24,-140); ctx.closePath(); ctx.fill();
+    } else if (d.k === "sign"){
+      const label = d.tag || "JUMP";
+      ctx.fillStyle = "#1a1a1f"; ctx.fillRect(-2,-46,4,46);
+      ctx.fillStyle = "#ffd166"; ctx.fillRect(-36,-72,72,28);
+      ctx.fillStyle = "#241a11"; ctx.font = `700 ${label.length > 5 ? 12 : 15}px ui-monospace,monospace`;
+      ctx.textAlign = "center"; ctx.fillText(label, 0, -52);
+    } else if (d.k === "water"){
+      ctx.fillStyle = "rgba(60,150,190,.5)"; ctx.fillRect(-d.w/2, 0, d.w, 26);
+      ctx.fillStyle = "rgba(150,225,255,.35)";
+      for (let k=0;k<5;k++) ctx.fillRect(-d.w/2 + k*d.w/5 + Math.sin(lightPulse*2+k)*7, 6, d.w/9, 2);
+    }
+    ctx.restore();
+  }
+
+  // ── decals
+  for (const d of decals){
+    if (d.x < L || d.x > R) continue;
+    ctx.globalAlpha = Math.max(0, 1 - d.t/9) * .5;
+    ctx.fillStyle = d.kind === "skid" ? "#100c08" : "#1a0f06";
+    ctx.fillRect(d.x-26, d.y-2, 52, 4);
+  }
+  ctx.globalAlpha = 1;
+
+  // ── props
+  for (const p of props){
+    if (!p.alive || p.x < L || p.x > R) continue;
+    ctx.save(); ctx.translate(p.x, p.y);
+    if (p.kind === "barrel"){
+      ctx.fillStyle = "#9d2f27"; ctx.fillRect(-16,-40,32,40);
+      ctx.fillStyle = "#d9d9d9"; ctx.fillRect(-16,-30,32,4); ctx.fillRect(-16,-14,32,4);
+    } else {
+      ctx.fillStyle = "#c9a15c"; ctx.fillRect(-21,-30,42,30);
+      ctx.strokeStyle = "#8a6a2f"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-21,-20); ctx.lineTo(21,-20); ctx.moveTo(-21,-10); ctx.lineTo(21,-10); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── LIGHTING. World space, so it crosses monitors.
+  ctx.globalCompositeOperation = "lighter";
+  const headlight = c => {
+    const dirx = Math.cos(c.ang), diry = Math.sin(c.ang);
+    const dim = c.darkSide != null ? 0.55 : 1;
+    lightPool(c.x + dirx*68, c.y + diry*68, 210, "rgba(255,236,190,ALPHA)", .16*dim);
+  };
+  headlight(runner); headlight(chaser);
+  const phase = Math.sin(lightPulse*9) > 0;
+  lightPool(chaser.x - 10, chaser.y - 30, 300, "rgba(255,40,40,ALPHA)",  phase ? .3 : .05);
+  lightPool(chaser.x + 10, chaser.y - 30, 300, "rgba(50,120,255,ALPHA)", phase ? .05 : .3);
+  ctx.globalCompositeOperation = "source-over";
+
+  // ── dust
+  for (const c of [runner, chaser]){
+    if (c.onGround && Math.abs(c.vx) > 300 && Math.random() < .55)
+      parts.push({x:c.x-42, y:c.y+16, vx:-c.vx*0.14+(Math.random()-.5)*60, vy:-Math.random()*90,
+                  life:.4+Math.random()*.5, t:0, col:"#7d6a52", sz:3+Math.random()*4});
+  }
+  for (const p of parts){
+    if (p.x < L || p.x > R) continue;
+    ctx.globalAlpha = Math.max(0, 1 - p.t/p.life);
+    ctx.fillStyle = p.col; ctx.fillRect(p.x, p.y, p.sz, p.sz);
+  }
+  ctx.globalAlpha = 1;
+
+  drawCruiser(chaser);
+  drawRunner(runner);
+
+  ctx.restore();
+
+  if (flash > 0){ ctx.fillStyle = `rgba(255,225,170,${flash*.2})`; ctx.fillRect(0,0,VW,VH); }
+
+  // vignette keeps the eye on the road and hides the panel edge a little
+  const vg = ctx.createRadialGradient(VW/2, VH*.6, VH*.25, VW/2, VH*.6, VH*.95);
+  vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,.55)");
+  ctx.fillStyle = vg; ctx.fillRect(0,0,VW,VH);
+
+  if (hudOn) drawMiniMap();
+}
+
+// ── mini-map: the whole loop as a strip, two live dots, gap ticks. Screen-space —
+// this is a fixed dashboard readout, not part of the scrolling world.
+function drawMiniMap(){
+  if (!worldW) return;
+  const mw = Math.min(260, VW*0.28), mh = 10, mx = VW - mw - 24, my = VH - 34;
+  const norm = x => (((x % worldW) + worldW) % worldW) / worldW;
+  ctx.save();
+  ctx.fillStyle = "rgba(10,16,26,.62)"; ctx.strokeStyle = "rgba(143,230,255,.28)"; ctx.lineWidth = 1;
+  ctx.fillRect(mx-10, my-20, mw+20, mh+34); ctx.strokeRect(mx-10, my-20, mw+20, mh+34);
+  ctx.fillStyle = "#8fe6ff"; ctx.font = "10px ui-monospace,monospace"; ctx.textAlign = "left";
+  ctx.fillText("TRACK", mx, my-8);
+  ctx.fillStyle = "#1b2636"; ctx.fillRect(mx, my, mw, mh);
+  ctx.strokeStyle = "#3a4f66"; ctx.strokeRect(mx, my, mw, mh);
+  ctx.fillStyle = "#ffd166";
+  for (const gp of gaps) ctx.fillRect(mx + norm(gp.liftX)*mw - 1, my-3, 2, mh+6);
+  ctx.fillStyle = "#e9edf4";
+  ctx.beginPath(); ctx.arc(mx + norm(chaser.x)*mw, my+mh/2, 3.5, 0, 7); ctx.fill();
+  ctx.fillStyle = "#ff9b3d";
+  ctx.beginPath(); ctx.arc(mx + norm(runner.x)*mw, my+mh/2, 4, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+/* ═══════════════════════ HUD ═══════════════════════ */
+const hud = document.getElementById("hud");
+function drawHud(fps){
+  if (!hudOn){ hud.textContent = ""; return; }
+  const gapPx = Math.abs(runner.x - chaser.x);
+  const link  = !busOK ? "NO BUS" : isHost ? "host · broadcasting"
+              : `client · rx ${net.rx} · Δ${net.drift.toFixed(1)}ms`;
+  hud.textContent =
+`PANEL ${ME+1}/${OF}    ${link}
+GAP ${gapPx.toFixed(0)}px    LAP ${laps}    SMASHED HERE ${scores[ME]||0}
+${fps.toFixed(0)} fps    ${audioOn ? "audio on" : "audio off (M)"}
+${demo ? "DEMO — press an arrow to take the wheel"
+       : "←→ drive   ↑↓ flip   0 demo   R reset   F full   H hud"}`;
+}
+
+/* ═══════════════════════ file:// guard ═══════════════════════ */
+setTimeout(() => {
+  if (OF > 1 && (!busOK || location.protocol === "file:")){
+    const w = document.getElementById("warn");
+    w.style.display = "block";
+    w.innerHTML = `<b>These windows cannot see each other over file://</b><br>
+      Chrome gives every <code>file://</code> page its own opaque origin, so BroadcastChannel
+      is dead on arrival. From a terminal in this folder:<br>
+      <code>python -m http.server 8765</code> &nbsp;then open
+      <code>http://localhost:8765/screenrig2.html</code>`;
+  }
+}, 2600);
+
+/* ═══════════════════════ LOOP ═══════════════════════ */
+const FIXED = 1/240;
+let last = performance.now(), acc = 0, fps = 60, sendAcc = 0, audAcc = 0;
+function frame(now){
+  let dt = (now - last)/1000; last = now;
+  if (dt > 0.1) dt = 0.1;
+  fps = fps*0.92 + (1/Math.max(dt,1e-4))*0.08;
+
+  if (!isHost && nowMs() - lastBeat > 1500 && ME === 1) isHost = true;   // failover
+
+  if (isHost){
+    acc += dt;
+    let n = 0;
+    while (acc >= FIXED && n < 70){ simulate(FIXED); acc -= FIXED; n++; }
+    if (n >= 70) acc = 0;
+    sendAcc += dt;
+    if (sendAcc >= 1/60){ sendState(); sendAcc = 0; }
+  }
+
+  stepFx(dt);
+  audAcc += dt; if (audAcc > 0.05){ audioTick(); audAcc = 0; }
+
+  if (!isHost){
+    const a = Math.min(0.05, Math.max(0, (nowMs() - net.lastRx)/1000));
+    const sr = {x:runner.x, y:runner.y, ang:runner.ang}, sc = {x:chaser.x, y:chaser.y, ang:chaser.ang};
+    runner.x += runner.vx*a; runner.y += runner.vy*a; runner.ang += runner.angV*a;
+    chaser.x += chaser.vx*a; chaser.y += chaser.vy*a; chaser.ang += chaser.angV*a;
+    render(dt);
+    Object.assign(runner, sr); Object.assign(chaser, sc);
+  } else render(dt);
+
+  drawHud(fps);
+  requestAnimationFrame(frame);
+}
+
+resize();
+buildTrack();
+runner.y = groundAt(runner.x) - runner.R;
+chaser.y = groundAt(chaser.x) - chaser.R;
+setInterval(announce, 2000);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
