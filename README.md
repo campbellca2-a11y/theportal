@@ -2,101 +2,58 @@
 
 **Put it here. Get it there.**
 
-Complete editable source plus a ready-to-run copy of the working phone/PC portal.
+Drop a file on your PC, grab it on your phone later. Or the other way round.
+No phone app, no cloud, no account. Scan a QR code once and you're paired.
 
-## Run it
+- **Nothing to install on the phone.** It runs in the phone's browser.
+- **The other side doesn't have to be there.** Files wait in the portal until you pick them up.
+- **Stays in your house.** Files go over your home Wi-Fi and are kept on your PC, never uploaded anywhere.
+- Photos, videos, documents, zips: any file type, up to 2 GB each, 10 GB in the portal at once.
 
-1. Keep this folder together. Node.js 22.13 or newer must be installed on the PC; it is already installed on this PC.
-2. Double-click **Start Portal.cmd**. The included runtime and built interface start without npm, a build, or internet access.
-3. On the PC, click **Connect phone**. On the same home Wi-Fi, scan the QR code or use the displayed address and six-digit code.
-4. Drop, choose, or paste a file on the PC. Choose photos/files or take a photo on the phone.
-5. Open or download the item from the other device.
+## Get it (Windows)
 
-**Stop Portal.cmd** stops only the process launched from this folder. Finish active uploads first. Keep the PC awake while using the portal.
+Download the installer from the [latest release](https://github.com/campbellca2-a11y/theportal/releases/latest), run it, then open **ThePortal** from the Start menu.
 
-If ThePortal is already running on port 48831, Start opens that existing instance. It does not replace the running installation. To run this source copy, stop the existing instance using its own Stop launcher first. The current working app and its inbox have been left intact.
+1. Your browser opens ThePortal on the PC.
+2. Click **Connect phone** and scan the QR code with your phone's camera. The phone must be on the same Wi-Fi.
+3. Drop files into the circle on either device. They show up on the other one.
 
-This clean source copy creates its own fresh inbox when first launched. Your original transferred files and pairing credentials are deliberately excluded.
+If Windows asks about network access, allow **Private networks**. If the phone can't connect, make sure your Wi-Fi is set to *Private* in Windows (Settings > Network & internet > Wi-Fi > your network).
 
-## What is included
+Windows only for now. Any phone with a modern browser works as the other end (iPhone tested; Android expected to work).
 
-| File or folder | Purpose |
-|---|---|
-| app/page.tsx | Complete interactive interface and phone/file controls |
-| app/globals.css | Layout, electric-yellow arrival cue, chasing corona |
-| app/layout.tsx | ThePortal name, tagline, browser/home-screen metadata |
-| server.mjs | Readable source for the local HTTP and file-transfer server |
-| lib/tally.mjs | Persistent shared transfer counter and reset |
-| lib/arrival-feedback.ts | Prevents duplicate or stale arrival cues |
-| components, hooks, lib | Included UI components and helpers |
-| ThePortal.runtime.mjs | Bundled server for running without npm dependencies |
-| dist/client | Prebuilt browser interface |
-| scripts/build-runtime.mjs | Recreates the bundled server from editable source |
-| tests | Transfer-service and arrival-cursor regression checks |
-| package.json, package-lock.json | Reproducible development dependency list |
-| THIRD-PARTY-NOTICES.md | Third-party package notices |
-| CONTROL.md | Current scope, evidence, and next checks |
+## Good to know
 
-The runtime is generated output. Make server edits in **server.mjs** and **lib**, then rebuild the runtime.
+- ThePortal uses plain HTTP on your local network. Pairing controls who can connect, but traffic isn't encrypted, so use it on your **home Wi-Fi**, not hotel or café networks.
+- Keep the PC awake while transferring.
+- Removing an item from the portal deletes only the portal's copy. Your original files are never touched.
+- An upload is refused if it would leave less than 1 GB free on the PC's drive.
+- On iPhone, downloads land in Files > Downloads. For photos, open the item and use Share > Save Image to put it in Photos.
 
-## Edit and rebuild
+## For developers
 
-From this folder:
+Requires Node.js 22.13 or newer.
 
     npm ci
-    npm run build:portable
+    npm run build:portable   # browser UI (dist/) + bundled server (ThePortal.runtime.mjs)
+    npm run start:portable   # run it at http://127.0.0.1:48831
+    npm test                 # service, limits and arrival checks
 
-That rebuilds both the browser interface and bundled server. Restart this folder's portal and refresh its browser tabs.
+Development mode: `npm start` (server from source) and `npm run dev` (UI at http://127.0.0.1:48832) in separate terminals.
 
-For source development:
+| Path | What it is |
+|---|---|
+| `server.mjs` | Local HTTP + transfer server: pairing, uploads, limits |
+| `app/page.tsx` | The whole interface: pairing door, portal, inbox |
+| `app/globals.css` | Styling, including the portal ring and arrival corona |
+| `lib/` | Transfer tally and arrival-cue logic |
+| `scripts/build-runtime.mjs` | Bundles the server into one file |
+| `tests/` | Service, limits and arrival-cue checks |
 
-    npm start
-    npm run dev
+Limits can be overridden for testing with `PORTAL_MAX_FILE`, `PORTAL_MAX_TOTAL` and `PORTAL_MIN_FREE` (bytes). `PORTAL_DATA_DIR` and `PORTAL_PORT` set the inbox folder and port (default 48831).
 
-Run these in separate terminals: the first starts the readable server source; the second opens the development interface at http://127.0.0.1:48832/. Stop any existing portal using port 48831 first. Production use only needs Start Portal.cmd.
+Never commit or share a `.portal-data` folder. It holds the inbox and pairing credentials.
 
-Useful focused commands:
+## License
 
-    npm run build
-    npm run build:runtime
-    npm run test:service
-    npm run test:arrivals
-
-## Everyday behavior
-
-- Any file type can transfer, including pictures, documents, and voice memos.
-- The other visible browser inbox refreshes roughly every 1.5 seconds.
-- A completed arrival turns the hole electric yellow and runs a corona for five seconds.
-- The shared counter counts each completed file once. Reset clears the counter on all devices without deleting files.
-- Reduced-motion mode uses a still yellow cue and readable text.
-- Copies remain in this folder's hidden **.portal-data** directory until removed.
-- Limits: 100 MB per file, 1 GB total.
-- The original files remain untouched. Formats are preserved as sent; HEIC previews depend on the receiving browser.
-- Browser downloads on iPhone normally appear in Files/Downloads. For compatible photos, Open then the browser's Share/Save Image action may save to Photos.
-- No automatic start at sign-in, Windows service, or cloud account is installed.
-
-## Android
-
-The current design uses ordinary browser file inputs and a separate camera input. The core workflow is expected to work in Chrome on Android, but has not been tested on an actual Android phone.
-
-Test camera selection/cancel, Photos/Files/audio, PC-to-phone downloads, multiple files, and returning after screen lock. Check Samsung Internet separately before claiming broad Android support.
-
-Direct **Share → ThePortal** from another app would be an optional enhancement. It would need an installed web app with a share target and an HTTPS plan; the current local-HTTP version does not include it.
-
-Sources: [MDN file inputs](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/file), [Chrome Web Share Target](https://developer.chrome.com/docs/capabilities/web-apis/web-share-target), [MDN service workers](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API).
-
-## Connection and data boundary
-
-This version runs on the same trusted home network using local HTTP. Its transport is not encrypted. Pairing restricts access; it does not provide TLS. No public tunnel, port forwarding, firewall changes, VPN changes, or account service is configured by this package.
-
-If the phone cannot connect, check PC sleep, same-network access, guest Wi-Fi isolation, and VPN local-network restrictions.
-
-Do not distribute a used .portal-data folder: it contains the inbox and credentials. The provided archive contains neither.
-
-## Verified evidence
-
-The original working app passed its production build, TypeScript check, 35 service tests, and nine arrival-cursor tests. The user confirmed iPhone file/photo uploads across Edge/Safari and PC browsers, plus a Voice Memo transferred through Files and played in Windows Media Player.
-
-Android device behavior and the exact camera-to-Photos round trip remain separate checks. Browser visual automation was not performed. See CONTROL.md for the package validation record.
-
-The packaged runtime was independently verified without node_modules: all 44 checks passed. Its Start/Stop launchers also passed an isolated start, repeated-start, and stop check. The source and runtime can be copied together to another folder without an npm installation; Node.js remains required.
+MIT. See [LICENSE](LICENSE) and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

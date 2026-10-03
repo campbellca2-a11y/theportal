@@ -15,7 +15,9 @@
     "build:runtime": "node scripts/build-runtime.mjs",
     "build:portable": "npm run build && npm run build:runtime",
     "test:service": "node tests/service.mjs",
-    "test:arrivals": "node --experimental-strip-types tests/arrivals.mjs"
+    "test:arrivals": "node --experimental-strip-types tests/arrivals.mjs",
+    "test:limits": "node tests/limits.mjs",
+    "test": "npm run test:service && npm run test:limits && npm run test:arrivals"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

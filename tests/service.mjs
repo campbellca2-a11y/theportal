@@ -59,7 +59,7 @@ try{
  r=await req(base,'/api/items',{method:'POST',cookie:pc,headers:{'Content-Type':'application/octet-stream','X-File-Name':'empty.txt'},body:Buffer.alloc(0)});
  check(r.status===201,'empty files are supported');
  const oversized=await new Promise((resolve,reject)=>{
-  const q=http.request(base+'/api/items',{method:'POST',headers:{Cookie:pc,'Content-Length':104857601}},r=>{r.resume();resolve(r.statusCode)});q.on('error',reject);q.end();
+  const q=http.request(base+'/api/items',{method:'POST',headers:{Cookie:pc,'Content-Length':2*1024*1024*1024+1}},r=>{r.resume();resolve(r.statusCode)});q.on('error',reject);q.end();
  });
  check(oversized===413,'oversized upload is rejected before reading file bytes');
  await stop();

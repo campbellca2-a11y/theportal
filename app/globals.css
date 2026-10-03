@@ -649,3 +649,131 @@ h1 {
     transform: none;
   }
 }
+
+/* The Door: the phone's pairing screen is the portal itself, closed.
+   Reuses the .black-hole ring so both screens read as one object. */
+.pair-form {
+  max-width: 450px;
+  margin: 2.5rem auto 2rem;
+  padding: 0 0.5rem;
+}
+.pair-form h2 {
+  font-size: clamp(1.3rem, 4vw, 1.6rem);
+  letter-spacing: -0.035em;
+}
+.pair-form .muted {
+  margin: 0.5rem auto 0;
+  max-width: 34ch;
+}
+.pair-form form {
+  position: relative;
+  isolation: isolate;
+  aspect-ratio: 1;
+  width: clamp(230px, 62vw, 300px);
+  margin: 1.6rem auto 0;
+  display: grid;
+  place-content: center;
+  gap: 0.9rem;
+  color: var(--foreground);
+  background: #010406;
+  border: 1px solid rgba(144, 255, 226, 0.48);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 9px rgba(119, 226, 206, 0.045),
+    0 0 0 20px rgba(119, 226, 206, 0.025),
+    0 0 60px rgba(71, 255, 204, 0.125),
+    inset 0 0 40px #103c3a;
+  transition:
+    box-shadow 0.25s,
+    border-color 0.25s;
+}
+.pair-form form::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  z-index: -1;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(
+    transparent 0%,
+    rgba(135, 243, 217, 0.08) 40%,
+    rgba(135, 243, 217, 0.3) 70%,
+    #87f3d9 90%,
+    transparent 100%
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 3px),
+    #000 calc(100% - 2px)
+  );
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.pair-form form:focus-within {
+  border-color: #a9ffea;
+  box-shadow:
+    0 0 0 12px rgba(119, 226, 206, 0.125),
+    0 0 0 28px rgba(119, 226, 206, 0.04),
+    0 0 75px rgba(71, 255, 204, 0.27),
+    inset 0 0 40px #134541;
+}
+.pair-form form:focus-within::before {
+  opacity: 0.9;
+  animation: door-sweep 3.2s linear infinite;
+}
+@keyframes door-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.pair-form input {
+  margin: 0;
+  width: min(190px, 56vw);
+  max-width: 190px;
+  padding: 0.55rem 0.4rem;
+  background: #071013;
+  border: 1px solid #2f6b58;
+  color: var(--primary);
+  caret-color: var(--primary);
+  font-size: 1.75rem;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+}
+.pair-form input::placeholder {
+  color: #3f6a62;
+}
+.pair-form input:focus-visible {
+  outline: 2px solid rgba(135, 243, 217, 0.67);
+  outline-offset: 3px;
+  border-color: #87f3d9;
+}
+.pair-form .control {
+  margin: 0 auto;
+  min-width: 130px;
+}
+.pair-form .notice {
+  margin-top: 1.4rem;
+  text-align: left;
+}
+@media (max-width: 600px) {
+  .pair-form {
+    margin-top: 1.6rem;
+  }
+}
+@media (max-height: 650px) {
+  .pair-form {
+    margin-top: 1rem;
+  }
+  .pair-form form {
+    width: clamp(200px, 40svh, 240px);
+  }
+  .pair-form input {
+    font-size: 1.5rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pair-form form:focus-within::before {
+    animation: none !important;
+    transform: rotate(35deg);
+  }
+}

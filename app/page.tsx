@@ -56,8 +56,20 @@ function bytes(n: number) {
     ? n + ' B'
     : n < 1048576
       ? (n / 1024).toFixed(1) + ' KB'
-      : (n / 1048576).toFixed(1) + ' MB';
+      : n < 1073741824
+        ? (n / 1048576).toFixed(1) + ' MB'
+        : (n / 1073741824).toFixed(1) + ' GB';
 }
+// Whole numbers for limits: "2 GB", "500 MB".
+function cap(n: number) {
+  return n >= 1073741824
+    ? +(n / 1073741824).toFixed(1) + ' GB'
+    : Math.round(n / 1048576) + ' MB';
+}
+const DEFAULT_MAX_FILE = 2 * 1073741824;
+const DEFAULT_MAX_TOTAL = 10 * 1073741824;
+// Abort an upload only if it stops making progress, never for being long.
+const STALL_MS = 60000;
 async function api<T = Record<string, unknown>>(
   path: string,
   options: RequestInit = {},
@@ -236,8 +248,9 @@ export default function Home() {
       try {
         for (let index = 0; index < selected.length; index++) {
           const file = selected[index];
-          if (file.size > (info?.maxFile || 104857600))
-            throw new Error(file.name + ' is larger than 100 MB.');
+          const maxFile = info?.maxFile || DEFAULT_MAX_FILE;
+          if (file.size > maxFile)
+            throw new Error(file.name + ' is larger than ' + cap(maxFile) + '.');
           setProgress({
             name: file.name,
             percent: 0,
@@ -248,13 +261,22 @@ export default function Home() {
             const xhr = new XMLHttpRequest();
             xhrRef.current = xhr;
             xhr.open('POST', '/api/items');
-            xhr.timeout = 300000;
+            let lastProgress = Date.now();
+            let stalled = false;
+            const watchdog = setInterval(() => {
+              if (Date.now() - lastProgress > STALL_MS) {
+                stalled = true;
+                xhr.abort();
+              }
+            }, 5000);
+            xhr.addEventListener('loadend', () => clearInterval(watchdog));
             xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
             xhr.setRequestHeader(
               'Content-Type',
               file.type || 'application/octet-stream',
             );
             xhr.upload.onprogress = (e) => {
+              lastProgress = Date.now();
               if (e.lengthComputable)
                 setProgress({
                   name: file.name,
@@ -281,9 +303,14 @@ export default function Home() {
               reject(
                 new Error('Connection lost. Keep the PC awake and try again.'),
               );
-            xhr.ontimeout = () =>
-              reject(new Error('Transfer timed out. Try again.'));
-            xhr.onabort = () => reject(new Error('Transfer canceled.'));
+            xhr.onabort = () =>
+              reject(
+                new Error(
+                  stalled
+                    ? 'Transfer stalled. Check the Wi-Fi and try again.'
+                    : 'Transfer canceled.',
+                ),
+              );
             xhr.send(file);
           });
           done++;
@@ -625,7 +652,8 @@ export default function Home() {
               </div>
             ) : (
               <p className="muted transfer-hint">
-                Drag, choose, or paste · up to 100 MB per file
+                Drag, choose, or paste · up to{' '}
+                {cap(info?.maxFile || DEFAULT_MAX_FILE)} per file
               </p>
             )}
           </section>
@@ -774,10 +802,10 @@ export default function Home() {
           )}
 
           <footer>
-            {bytes(used)} of 1 GB · Copies stay on this PC until you remove
-            them.
+            {bytes(used)} of {cap(info?.maxTotal || DEFAULT_MAX_TOTAL)} ·
+            Copies stay on this PC until you remove them.
             <br />
-            Keep the PC awake. This proof uses HTTP on your home network.
+            Keep the PC awake. Use ThePortal on your home Wi-Fi only.
           </footer>
         </>
       )}

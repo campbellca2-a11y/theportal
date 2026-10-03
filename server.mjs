@@ -8,6 +8,7 @@ import {
   unlink,
   readdir,
   stat,
+  statfs,
 } from 'node:fs/promises';
 import {
   randomBytes,
@@ -27,8 +28,28 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(process.env.PORTAL_DATA_DIR || join(ROOT, '.portal-data'));
 const ITEMS = join(DATA, 'items');
 const PORT = Number(process.env.PORTAL_PORT || 48831);
-const MAX_FILE = 100 * 1024 * 1024;
-const MAX_TOTAL = 1024 * 1024 * 1024;
+const GB = 1024 * 1024 * 1024;
+function limit(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+// Per-file cap, inbox cap, and the free space that must remain on the drive.
+const MAX_FILE = limit('PORTAL_MAX_FILE', 2 * GB);
+const MAX_TOTAL = limit('PORTAL_MAX_TOTAL', 10 * GB);
+const MIN_FREE = limit('PORTAL_MIN_FREE', 1 * GB);
+function size(n) {
+  return n >= GB
+    ? +(n / GB).toFixed(1) + ' GB'
+    : Math.round(n / (1024 * 1024)) + ' MB';
+}
+async function freeBytes() {
+  try {
+    const s = await statfs(DATA);
+    return s.bavail * s.bsize;
+  } catch {
+    return Infinity;
+  }
+}
 const interfaces = Object.entries(networkInterfaces()).flatMap(
   ([name, values]) =>
     (values || [])
@@ -284,7 +305,7 @@ async function handle(req, res) {
       return json(res, 411, { error: 'A file size is required.' });
     if (length > MAX_FILE)
       return json(res, 413, {
-        error: 'This proof accepts files up to 100 MB.',
+        error: 'Files can be up to ' + size(MAX_FILE) + ' each.',
       });
     if (
       [...records.values()].reduce((n, r) => n + r.size, 0) +
@@ -294,7 +315,15 @@ async function handle(req, res) {
       MAX_TOTAL
     )
       return json(res, 507, {
-        error: 'The portal is full (1 GB). Remove some portal copies first.',
+        error:
+          'The portal is full (' +
+          size(MAX_TOTAL) +
+          '). Remove some portal copies first.',
+      });
+    if ((await freeBytes()) - reserved - length < MIN_FREE)
+      return json(res, 507, {
+        error:
+          'This PC is almost out of disk space. Free up space and try again.',
       });
     let name;
     try {
@@ -449,7 +478,10 @@ for (const host of binds) {
       else res.destroy();
     }),
   );
-  server.requestTimeout = 5 * 60 * 1000;
+  // Large files can take a long time on slow Wi-Fi: no total-duration cap,
+  // but drop a connection that sends nothing for two minutes.
+  server.requestTimeout = 0;
+  server.timeout = 2 * 60 * 1000;
   server.headersTimeout = 30000;
   await new Promise((ok, fail) => {
     server.once('error', fail);

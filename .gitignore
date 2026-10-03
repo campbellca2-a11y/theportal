@@ -9,3 +9,21 @@ node_modules/
 .DS_Store
 Thumbs.db
 .portal-data/
+
+# Build output (rebuilt by `npm run build:portable` and by CI)
+dist/
+.next/
+ThePortal.runtime.mjs
+tsconfig.tsbuildinfo
+
+# Local runtime, test scratch and logs
+.runtime/
+runtime/
+work/
+launch.log
+
+# Release artifacts and stray archives never belong in source control
+*.zip
+*.exe
+*.iss.bak
+_leftovers/
