@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ThePortal — Put it here. Get it there.</title>
+<meta name="description" content="Move files between your Windows PC and phone on your home network. Install once. Open ThePortal. Connect your phone.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23050e14'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%231febd4' stroke-width='5'/%3E%3C/svg%3E">
+<style>
+:root{color-scheme:dark;--bg:#050e14;--ink:#effffc;--muted:#a5bcbf;--teal:#1febd4;--yellow:#ecff3c}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.65 system-ui,sans-serif}main,header,footer{max-width:1140px;margin:auto;padding:28px}header{display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid #203339}.brand{font-size:24px;font-weight:750;letter-spacing:-1px}.brand span{color:var(--teal)}.review{font-size:14px;color:var(--muted)}.hero{display:grid;grid-template-columns:1.1fr 1fr;gap:55px;align-items:center;padding:55px 0 45px}.eyebrow{font-size:14px;color:var(--teal);letter-spacing:.13em;text-transform:uppercase}h1{font-size:clamp(42px,6vw,72px);letter-spacing:-.055em;line-height:1.07;margin:20px 0 26px}h1 span{color:var(--teal)}p{max-width:560px}.lede{font-size:20px;color:var(--muted)}.cta{display:inline-block;background:var(--teal);color:#032520;border:0;border-radius:9px;padding:15px 23px;font:700 17px system-ui;text-decoration:none;margin-top:15px}.cta:disabled{background:#173c3b;color:#abc8c5;cursor:default}.fine{font-size:14px;color:var(--muted);margin-top:13px}a{color:var(--teal);text-underline-offset:4px}a:focus-visible,button:focus-visible{outline:3px solid var(--yellow);outline-offset:6px}.visual{text-align:center}.portal{width:min(100%,340px);aspect-ratio:1;border-radius:50%;border:3px solid var(--teal);background:radial-gradient(circle,#000 46%,#05272d 68%,#0a655f 74%,#030d12 76%);box-shadow:0 0 60px #1febd420,inset 0 0 30px #1febd460;color:var(--ink);font:600 22px system-ui;cursor:pointer;transition:box-shadow .4s,border-color .4s}.portal small{display:block;font-size:15px;font-weight:400;color:var(--muted);margin-top:10px}.portal.arrived{border-color:var(--yellow);box-shadow:0 0 70px #ecff3c50,inset 0 0 45px #ecff3c80}.portal.arrived span{color:var(--yellow)}#demo-status{min-height:28px}.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;padding:32px 0;border-top:1px solid #203339;border-bottom:1px solid #203339}.number{font-size:14px;color:var(--teal)}h2{font-size:22px;line-height:1.3;margin:10px 0} .steps p{color:var(--muted);margin-bottom:0}.details{display:grid;grid-template-columns:1fr 1fr;gap:60px;padding:35px 0 0}.details p{color:var(--muted)}footer{font-size:14px;color:var(--muted);padding-bottom:45px}@media(max-width:720px){header,main,footer{padding:22px}.hero{grid-template-columns:1fr;gap:35px;padding:30px 0}.portal{width:250px}.steps,.details{grid-template-columns:1fr;gap:20px}.review{max-width:140px;text-align:right}}@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header><div class="brand">ThePortal<span>.</span></div><div class="review">Windows 10 / 11</div></header>
+<main>
+<section class="hero">
+<div><div class="eyebrow">Your PC. Your phone. Your files.</div><h1>Put it here.<br><span>Get it there.</span></h1><p class="lede">Move photos, videos, documents and voice memos between your phone and Windows PC on your home network. Drop it on one, pick it up on the other whenever you like.</p>
+<a class="cta" href="https://github.com/campbellca2-a11y/theportal/releases/latest">Download for Windows</a><p class="fine">Windows 10 / 11 · x64 · runtime included<br>No account. No separate phone app.</p><p class="fine">Not code-signed yet: if Windows says it protected your PC, choose More info &gt; Run anyway.</p></div>
+<div class="visual"><button class="portal" id="portal" aria-label="Preview the arrival effect"><span id="portal-label">Put it here.</span><small>Preview the arrival glow</small></button><p class="fine" id="demo-status" role="status" aria-live="polite">Click to see the arrival cue. No files needed.</p></div>
+</section>
+<section class="steps" aria-label="How to use ThePortal">
+<div><span class="number">01 / INSTALL</span><h2>Make yourself at home.</h2><p>Download the Windows installer, run it, then open ThePortal from its shortcut.</p></div>
+<div><span class="number">02 / CONNECT</span><h2>Bring your phone.</h2><p>Use the same home Wi-Fi. Click Connect phone on your PC and scan the QR code.</p></div>
+<div><span class="number">03 / TRANSFER</span><h2>Send it through.</h2><p>Drop or choose a file on either device. Open or download it on the other. Keep the PC awake.</p></div>
+</section>
+<section class="details">
+<div><h2>A little less cloud.</h2><p>The website supplies the app. Your installed Portal moves files on your local network and keeps its inbox on your PC. It works without internet access after installation.</p><p>Up to 2 GB per file · 10 GB inbox. Removing a Portal copy leaves the original alone.</p></div>
+<div><h2>Know where it works.</h2><p>This version connects devices on the same trusted home network. It does not send files between different homes. Local transfers use HTTP and are not encrypted.</p><p>If Windows asks for network access, allow Private networks on your trusted home network. Android device testing is still pending.</p></div>
+</section>
+</main>
+<footer>Put it here. Get it there. <span>·</span> <a href="https://github.com/campbellca2-a11y/theportal">Source &amp; project</a></footer>
+<script>
+const portal=document.getElementById('portal'),label=document.getElementById('portal-label'),status=document.getElementById('demo-status');let timer;
+portal.addEventListener('click',()=>{clearTimeout(timer);portal.classList.add('arrived');label.textContent='It arrived.';status.textContent='Arrival preview only — no file was sent.';timer=setTimeout(()=>{portal.classList.remove('arrived');label.textContent='Put it here.';status.textContent='Click to see the arrival cue. No files needed.'},5000)});
+</script>
+</body></html>

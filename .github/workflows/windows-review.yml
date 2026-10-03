@@ -1,0 +1,60 @@
+name: Windows installer review
+on:
+  push:
+    branches: [main, distribution/windows-installer-review]
+    tags: ['v*']
+    paths-ignore: ['**/*.md']
+  workflow_dispatch:
+concurrency:
+  group: windows-installer-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: write
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:portable
+      - run: npm run test:service
+      - run: npm run test:limits
+      - run: npm run test:arrivals
+      - name: Build Windows installer
+        shell: pwsh
+        run: ./packaging/windows/Build.ps1
+      - name: Install, launch, transfer, restart and uninstall
+        shell: pwsh
+        run: ./packaging/windows/Smoke.ps1
+      - name: Render download page at desktop and phone sizes
+        shell: pwsh
+        run: |
+          $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+          $url = ([uri](Join-Path $pwd 'distribution/index.html')).AbsoluteUri
+          foreach ($size in @('1280,1100', '390,1600')) {
+            $out = Join-Path $pwd "release/preview-$($size.Replace(',', '-')).png"
+            $profile = Join-Path $env:TEMP "portal-preview-$($size.Replace(',', '-'))"
+            $args = "--headless=new --disable-gpu --no-sandbox --no-first-run --user-data-dir=`"$profile`" --screenshot=`"$out`" --window-size=$size --virtual-time-budget=1500 `"$url`""
+            $p = Start-Process $chrome -ArgumentList $args -PassThru
+            if (-not $p.WaitForExit(30000)) { $p.Kill(); throw 'Preview render timed out' }
+            if (-not (Test-Path $out)) { throw 'Preview screenshot missing' }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ThePortal-Windows-review
+          path: release/*
+          if-no-files-found: error
+      # Pushing a tag like v1.0.0 publishes the tested installer as a GitHub Release.
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $setup = Get-ChildItem release -Filter 'ThePortalSetup-*-windows-x64.exe' | Select-Object -First 1
+          gh release create $env:GITHUB_REF_NAME $setup.FullName "$($setup.FullName).sha256" --title "ThePortal $env:GITHUB_REF_NAME" --notes-file packaging/windows/RELEASE-NOTES.md
