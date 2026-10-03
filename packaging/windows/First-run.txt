@@ -9,22 +9,26 @@ The phone uses its browser; no phone app or account is required.
 Keep the PC awake. Closing the browser leaves ThePortal running.
 Use Start > ThePortal > Stop ThePortal when finished, after transfers complete.
 
-If Windows asks about network access, allow only Private networks on a
-trusted home network. Do not disable your firewall. Work-managed devices
-may need an administrator to permit local network access.
-If the phone cannot connect, check the network, PC sleep, VPN LAN settings,
-and guest Wi-Fi isolation.
+If Windows asks about network access, allow Private networks.
+Do not disable your firewall.
+
+If the phone cannot connect:
+- In Windows, set your Wi-Fi to Private: Settings > Network & internet >
+  Wi-Fi > your network > Private network. (ThePortal warns you if it's Public.)
+- Make sure the phone is on the same Wi-Fi, not mobile data or a guest network.
+- Check the PC isn't asleep and that a VPN isn't blocking local traffic.
+Work-managed PCs may need an administrator to allow local network access.
 
 Files travel on your local network and are stored on this PC, not uploaded
 to the public download site. This version uses unencrypted local HTTP;
 pairing controls access but does not encrypt traffic.
-100 MB per file; 1 GB inbox. Remove only Portal copies through the app.
+Up to 2 GB per file; 10 GB in the inbox. Uploads are refused if they would
+leave less than 1 GB free on the drive. Remove Portal copies through the app.
 Original files are untouched. Downloads already saved elsewhere remain.
 
 Inbox location: %LOCALAPPDATA%\ThePortal\Data
 Uninstalling preserves this inbox. A new install creates its own credentials;
 it does not import files or pairing from older copies automatically.
 
-Review build: unsigned. Windows may show an unknown-publisher or reputation
-warning. Do not disable security software. Broad public release awaits
-Windows/phone acceptance testing and a signing decision.
+This installer is not code-signed yet. Windows may say "Windows protected
+your PC". Click More info, then Run anyway. Do not disable security software.

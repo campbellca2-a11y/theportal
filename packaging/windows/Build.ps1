@@ -21,6 +21,6 @@ if (-not (Test-Path $compiler)) { $compiler = "${env:ProgramFiles(x86)}\Inno Set
 if (-not (Test-Path $compiler)) { throw 'Install Inno Setup 6.4+ before building' }
 & $compiler "$PSScriptRoot\ThePortal.iss"
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
-$installer = Join-Path $root 'release\ThePortalSetup-0.1.1-windows-x64.exe'
+$installer = (Get-ChildItem (Join-Path $root 'release') -Filter 'ThePortalSetup-*-windows-x64.exe' | Select-Object -First 1).FullName
 $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
 "$hash  $([IO.Path]::GetFileName($installer))" | Set-Content "$installer.sha256" -Encoding ascii

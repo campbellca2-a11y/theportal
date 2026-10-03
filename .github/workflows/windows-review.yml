@@ -1,14 +1,15 @@
 name: Windows installer review
 on:
   push:
-    branches: [distribution/windows-installer-review]
+    branches: [main, distribution/windows-installer-review]
+    tags: ['v*']
     paths-ignore: ['**/*.md']
   workflow_dispatch:
 concurrency:
-  group: windows-installer-review
+  group: windows-installer-${{ github.ref }}
   cancel-in-progress: true
 permissions:
-  contents: read
+  contents: write
 jobs:
   installer:
     runs-on: windows-latest
@@ -22,6 +23,7 @@ jobs:
       - run: npm ci
       - run: npm run build:portable
       - run: npm run test:service
+      - run: npm run test:limits
       - run: npm run test:arrivals
       - name: Build Windows installer
         shell: pwsh
@@ -47,3 +49,12 @@ jobs:
           name: ThePortal-Windows-review
           path: release/*
           if-no-files-found: error
+      # Pushing a tag like v1.0.0 publishes the tested installer as a GitHub Release.
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $setup = Get-ChildItem release -Filter 'ThePortalSetup-*-windows-x64.exe' | Select-Object -First 1
+          gh release create $env:GITHUB_REF_NAME $setup.FullName "$($setup.FullName).sha256" --title "ThePortal $env:GITHUB_REF_NAME" --notes-file packaging/windows/RELEASE-NOTES.md

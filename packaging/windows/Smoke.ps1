@@ -4,7 +4,7 @@ $root = (Resolve-Path "$PSScriptRoot\..\..").Path
 $install = Join-Path $env:TEMP 'ThePortal Installer Test'
 $data = Join-Path $env:LOCALAPPDATA 'ThePortal\Data'
 if (Test-Path $data) { throw 'Smoke test requires a fresh Windows user with no Portal data' }
-$setup = Join-Path $root 'release\ThePortalSetup-0.1.1-windows-x64.exe'
+$setup = (Get-ChildItem (Join-Path $root 'release') -Filter 'ThePortalSetup-*-windows-x64.exe' | Select-Object -First 1).FullName
 function Run([string]$file, [string]$arguments) {
     $p = Start-Process $file -ArgumentList $arguments -PassThru
     # Wait only for the launcher, not its intentionally long-lived server child.

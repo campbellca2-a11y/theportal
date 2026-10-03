@@ -24,7 +24,7 @@ The phone needs only its browser. Distribution over the internet does not requir
 
 No account, cloud relay, public tunnel, port forwarding, scheduled startup, or telemetry is added. The existing server and transfer UI are unchanged. Original files are not migrated or modified. Uninstall preserves the inbox. Existing standalone installations retain their own inboxes and must be stopped before opening this installed version on port 48831.
 
-The current protocol is HTTP on a trusted LAN. Pairing is access control, not encryption. Limits remain 100 MB/file and 1 GB/inbox. Transfers between different homes are outside this version. Android hardware support still needs validation.
+The current protocol is HTTP on a trusted LAN. Pairing is access control, not encryption. Limits are 2 GB per file and 10 GB per inbox, with a 1 GB free-disk floor. Transfers between different homes are outside this version. Android hardware support still needs validation.
 
 ## What changed
 
