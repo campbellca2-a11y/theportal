@@ -777,3 +777,25 @@ h1 {
     transform: rotate(35deg);
   }
 }
+
+/* Phone: where saved files end up. */
+.save-guide {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #2f6b58;
+  border-radius: 0.8rem;
+  background: #112322;
+  color: #c9dcda;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.save-guide strong {
+  color: var(--primary);
+  font-weight: 600;
+}
+.save-guide b {
+  color: var(--foreground);
+  font-weight: 600;
+}

@@ -1,14 +1,14 @@
-'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
+"use client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { receiveTally, type TransferTally } from '@/lib/arrival-feedback';
+} from "@/components/ui/dialog";
+import { receiveTally, type TransferTally } from "@/lib/arrival-feedback";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -18,7 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
   AlertDialogAction,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
 import {
   Camera,
   FileUp,
@@ -28,7 +28,7 @@ import {
   Smartphone,
   RefreshCw,
   ArrowUpRight,
-} from 'lucide-react';
+} from "lucide-react";
 type Item = {
   id: string;
   name: string;
@@ -46,44 +46,39 @@ type Info = {
 };
 type Message = { text: string; error?: boolean };
 type ToolRegistry = {
-  registerTool: (
-    tool: unknown,
-    options: { signal: AbortSignal },
-  ) => void | Promise<void>;
+  registerTool: (tool: unknown, options: { signal: AbortSignal }) => void | Promise<void>;
 };
 function bytes(n: number) {
   return n < 1024
-    ? n + ' B'
+    ? n + " B"
     : n < 1048576
-      ? (n / 1024).toFixed(1) + ' KB'
+      ? (n / 1024).toFixed(1) + " KB"
       : n < 1073741824
-        ? (n / 1048576).toFixed(1) + ' MB'
-        : (n / 1073741824).toFixed(1) + ' GB';
+        ? (n / 1048576).toFixed(1) + " MB"
+        : (n / 1073741824).toFixed(1) + " GB";
 }
 // Whole numbers for limits: "2 GB", "500 MB".
 function cap(n: number) {
-  return n >= 1073741824
-    ? +(n / 1073741824).toFixed(1) + ' GB'
-    : Math.round(n / 1048576) + ' MB';
+  return n >= 1073741824 ? +(n / 1073741824).toFixed(1) + " GB" : Math.round(n / 1048576) + " MB";
 }
+const isIPhone =
+  typeof navigator !== "undefined" &&
+  (/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
 const DEFAULT_MAX_FILE = 2 * 1073741824;
 const DEFAULT_MAX_TOTAL = 10 * 1073741824;
 // Abort an upload only if it stops making progress, never for being long.
 const STALL_MS = 60000;
-async function api<T = Record<string, unknown>>(
-  path: string,
-  options: RequestInit = {},
-) {
-  const response = await fetch('/api/' + path, {
+async function api<T = Record<string, unknown>>(path: string, options: RequestInit = {}) {
+  const response = await fetch("/api/" + path, {
     ...options,
-    cache: 'no-store',
+    cache: "no-store",
   });
   const data = (await response.json()) as T & { error?: string };
   if (!response.ok)
-    throw Object.assign(
-      new Error(data.error || 'The PC could not finish that request.'),
-      { status: response.status },
-    );
+    throw Object.assign(new Error(data.error || "The PC could not finish that request."), {
+      status: response.status,
+    });
   return data;
 }
 export default function Home() {
@@ -93,7 +88,7 @@ export default function Home() {
   const [items, setItems] = useState<Item[]>([]),
     [info, setInfo] = useState<Info | null>(null);
   const [notice, setNotice] = useState<Message | null>(null),
-    [code, setCode] = useState(''),
+    [code, setCode] = useState(""),
     [pairBusy, setPairBusy] = useState(false);
   const [showPair, setShowPair] = useState(false),
     [dragging, setDragging] = useState(false);
@@ -111,9 +106,7 @@ export default function Home() {
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const [tally, setTally] = useState<TransferTally | null>(null),
     [resetBusy, setResetBusy] = useState(false);
-  const [arrival, setArrival] = useState<{ id: number; count: number } | null>(
-      null,
-    ),
+  const [arrival, setArrival] = useState<{ id: number; count: number } | null>(null),
     [glowing, setGlowing] = useState(false);
   const tallyRef = useRef<TransferTally | null>(null),
     refreshRequest = useRef(0),
@@ -139,7 +132,7 @@ export default function Home() {
   const refresh = useCallback(async () => {
     const request = ++refreshRequest.current;
     try {
-      const data = await api<{ items: Item[]; tally?: TransferTally }>('items');
+      const data = await api<{ items: Item[]; tally?: TransferTally }>("items");
       if (request >= lastAppliedRequest.current) {
         lastAppliedRequest.current = request;
         const stale = observeTally(data.tally);
@@ -157,7 +150,7 @@ export default function Home() {
     }
   }, [observeTally]);
   const load = useCallback(async () => {
-    const data = await api<Info>('info');
+    const data = await api<Info>("info");
     setInfo(data);
     await refresh();
     setConnected(true);
@@ -167,22 +160,18 @@ export default function Home() {
     let alive = true;
     (async () => {
       try {
-        const token = new URLSearchParams(window.location.hash.slice(1)).get(
-          'pair',
-        );
+        const token = new URLSearchParams(window.location.hash.slice(1)).get("pair");
         if (token) {
-          history.replaceState(null, '', window.location.pathname);
-          await api('connect', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          history.replaceState(null, "", window.location.pathname);
+          await api("connect", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ token }),
           });
-        } else if (
-          ['127.0.0.1', 'localhost'].includes(window.location.hostname)
-        )
-          await api('connect', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+        } else if (["127.0.0.1", "localhost"].includes(window.location.hostname))
+          await api("connect", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ local: true }),
           });
         if (alive) await load();
@@ -191,7 +180,7 @@ export default function Home() {
           setReady(true);
           if ((e as { status?: number }).status !== 401)
             setNotice({
-              text: 'Cannot reach the PC. Make sure the portal is running and both devices are on the home network.',
+              text: "Cannot reach the PC. Make sure the portal is running and both devices are on the home network.",
               error: true,
             });
         }
@@ -209,17 +198,17 @@ export default function Home() {
     const poll = setInterval(update, 1500),
       infoPoll = setInterval(() => {
         if (!document.hidden)
-          void api<Info>('info')
+          void api<Info>("info")
             .then(setInfo)
             .catch(() => {});
       }, 60000);
-    document.addEventListener('visibilitychange', update);
-    window.addEventListener('online', update);
+    document.addEventListener("visibilitychange", update);
+    window.addEventListener("online", update);
     return () => {
       clearInterval(poll);
       clearInterval(infoPoll);
-      document.removeEventListener('visibilitychange', update);
-      window.removeEventListener('online', update);
+      document.removeEventListener("visibilitychange", update);
+      window.removeEventListener("online", update);
     };
   }, [connected, refresh]);
   async function pair(event: React.FormEvent) {
@@ -227,10 +216,10 @@ export default function Home() {
     setPairBusy(true);
     setNotice(null);
     try {
-      await api('connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.replace(/\s/g, '') }),
+      await api("connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code.replace(/\s/g, "") }),
       });
       await load();
     } catch (e) {
@@ -250,7 +239,7 @@ export default function Home() {
           const file = selected[index];
           const maxFile = info?.maxFile || DEFAULT_MAX_FILE;
           if (file.size > maxFile)
-            throw new Error(file.name + ' is larger than ' + cap(maxFile) + '.');
+            throw new Error(file.name + " is larger than " + cap(maxFile) + ".");
           setProgress({
             name: file.name,
             percent: 0,
@@ -260,7 +249,7 @@ export default function Home() {
           await new Promise<void>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhrRef.current = xhr;
-            xhr.open('POST', '/api/items');
+            xhr.open("POST", "/api/items");
             let lastProgress = Date.now();
             let stalled = false;
             const watchdog = setInterval(() => {
@@ -269,12 +258,9 @@ export default function Home() {
                 xhr.abort();
               }
             }, 5000);
-            xhr.addEventListener('loadend', () => clearInterval(watchdog));
-            xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
-            xhr.setRequestHeader(
-              'Content-Type',
-              file.type || 'application/octet-stream',
-            );
+            xhr.addEventListener("loadend", () => clearInterval(watchdog));
+            xhr.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
+            xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
             xhr.upload.onprogress = (e) => {
               lastProgress = Date.now();
               if (e.lengthComputable)
@@ -292,7 +278,7 @@ export default function Home() {
                 } catch {}
                 resolve();
               } else {
-                let error = 'Upload failed. Try again.';
+                let error = "Upload failed. Try again.";
                 try {
                   error = JSON.parse(xhr.responseText).error || error;
                 } catch {}
@@ -300,15 +286,13 @@ export default function Home() {
               }
             };
             xhr.onerror = () =>
-              reject(
-                new Error('Connection lost. Keep the PC awake and try again.'),
-              );
+              reject(new Error("Connection lost. Keep the PC awake and try again."));
             xhr.onabort = () =>
               reject(
                 new Error(
                   stalled
-                    ? 'Transfer stalled. Check the Wi-Fi and try again.'
-                    : 'Transfer canceled.',
+                    ? "Transfer stalled. Check the Wi-Fi and try again."
+                    : "Transfer canceled.",
                 ),
               );
             xhr.send(file);
@@ -319,13 +303,12 @@ export default function Home() {
         setNotice({
           text:
             done === 1
-              ? 'In the portal. Ready on your other device.'
-              : done + ' files are in the portal.',
+              ? "In the portal. Ready on your other device."
+              : done + " files are in the portal.",
         });
       } catch (e) {
         setNotice({
-          text:
-            (done ? done + ' file(s) arrived. ' : '') + (e as Error).message,
+          text: (done ? done + " file(s) arrived. " : "") + (e as Error).message,
           error: true,
         });
       } finally {
@@ -338,37 +321,30 @@ export default function Home() {
   );
   useEffect(() => {
     const paste = (event: ClipboardEvent) => {
-      if (
-        (event.target as HTMLElement)?.closest(
-          'input,textarea,[contenteditable="true"]',
-        )
-      )
-        return;
+      if ((event.target as HTMLElement)?.closest('input,textarea,[contenteditable="true"]')) return;
       const selected = Array.from(event.clipboardData?.files || []);
       if (selected.length) {
         event.preventDefault();
         void upload(selected);
       }
     };
-    document.addEventListener('paste', paste);
-    return () => document.removeEventListener('paste', paste);
+    document.addEventListener("paste", paste);
+    return () => document.removeEventListener("paste", paste);
   }, [upload]);
   useEffect(() => {
     if (!connected) return;
-    const registry = (document as Document & { modelContext?: ToolRegistry })
-      .modelContext;
+    const registry = (document as Document & { modelContext?: ToolRegistry }).modelContext;
     if (!registry?.registerTool) return;
     const lifecycle = new AbortController();
     try {
       void Promise.resolve(
         registry.registerTool(
           {
-            name: 'list_portal_items',
-            title: 'List portal files',
-            description:
-              'Refresh and list files currently in this paired portal.',
+            name: "list_portal_items",
+            title: "List portal files",
+            description: "Refresh and list files currently in this paired portal.",
             inputSchema: {
-              type: 'object',
+              type: "object",
               properties: {},
               additionalProperties: false,
             },
@@ -376,11 +352,11 @@ export default function Home() {
             execute: async (input: unknown) => {
               if (
                 !input ||
-                typeof input !== 'object' ||
+                typeof input !== "object" ||
                 Array.isArray(input) ||
                 Object.keys(input).length
               )
-                throw new Error('Expected an empty object.');
+                throw new Error("Expected an empty object.");
               return { items: await refresh() };
             },
           },
@@ -394,11 +370,11 @@ export default function Home() {
     if (!removing) return;
     setDeleteBusy(true);
     try {
-      await api('items/' + removing.id, { method: 'DELETE' });
+      await api("items/" + removing.id, { method: "DELETE" });
       setRemoving(null);
       await refresh();
       setNotice({
-        text: 'Removed the portal copy. Your original file is unchanged.',
+        text: "Removed the portal copy. Your original file is unchanged.",
       });
     } catch (e) {
       setNotice({ text: (e as Error).message, error: true });
@@ -409,19 +385,18 @@ export default function Home() {
   async function resetTally() {
     setResetBusy(true);
     try {
-      const data = await api<{ tally: TransferTally }>('tally/reset', {
-        method: 'POST',
+      const data = await api<{ tally: TransferTally }>("tally/reset", {
+        method: "POST",
       });
       observeTally(data.tally);
-      setNotice({ text: 'Tally reset. Your files are still here.' });
+      setNotice({ text: "Tally reset. Your files are still here." });
     } catch (e) {
       setNotice({ text: (e as Error).message, error: true });
     } finally {
       setResetBusy(false);
     }
   }
-  const previewable = (mime: string) =>
-    /^image\/(jpeg|png|gif|webp|avif|bmp)$/.test(mime);
+  const previewable = (mime: string) => /^image\/(jpeg|png|gif|webp|avif|bmp)$/.test(mime);
   const used = items.reduce((total, item) => total + item.size, 0);
   return (
     <main className="portal-shell">
@@ -430,21 +405,17 @@ export default function Home() {
           <h1>
             ThePortal<span>.</span>
           </h1>
-          <p className="tagline">
-            Put it here. Get it there.
-          </p>
+          <p className="tagline">Put it here. Get it there.</p>
         </div>
         <div className="header-actions">
-          <span
-            className={'connection ' + (connected && online ? 'online' : '')}
-          >
+          <span className={"connection " + (connected && online ? "online" : "")}>
             {!ready
-              ? 'Connecting…'
+              ? "Connecting…"
               : !connected
-                ? 'Pair your device'
+                ? "Pair your device"
                 : online
-                  ? 'Connected'
-                  : 'PC unreachable · retrying'}
+                  ? "Connected"
+                  : "PC unreachable · retrying"}
           </span>
           {connected && info?.local && info.pair && (
             <Button
@@ -455,19 +426,18 @@ export default function Home() {
               aria-controls="pair-panel"
             >
               <Smartphone />
-              {showPair ? 'Close pairing' : 'Connect phone'}
+              {showPair ? "Close pairing" : "Connect phone"}
             </Button>
           )}
         </div>
       </header>
       {!connected ? (
         <section className="pair-form">
-          <h2>{!ready ? 'Opening the portal…' : 'Connect to your PC'}</h2>
+          <h2>{!ready ? "Opening the portal…" : "Connect to your PC"}</h2>
           {ready && (
             <>
               <p className="muted">
-                Enter the six-digit code shown in the portal on your PC, or scan
-                its QR code.
+                Enter the six-digit code shown in the portal on your PC, or scan its QR code.
               </p>
               <form onSubmit={pair}>
                 <label htmlFor="pair-code" className="sr-only">
@@ -481,15 +451,11 @@ export default function Home() {
                   maxLength={6}
                   placeholder="000000"
                   value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                   required
                 />
-                <Button
-                  type="submit"
-                  className="control"
-                  disabled={pairBusy || code.length !== 6}
-                >
-                  {pairBusy ? 'Connecting…' : 'Connect'}
+                <Button type="submit" className="control" disabled={pairBusy || code.length !== 6}>
+                  {pairBusy ? "Connecting…" : "Connect"}
                 </Button>
               </form>
             </>
@@ -503,16 +469,10 @@ export default function Home() {
       ) : (
         <>
           <section className="portal-area" aria-label="Transfer files">
-            <div className={'hole-stage ' + (glowing ? 'arrived' : '')}>
-              {glowing && (
-                <span
-                  key={arrival?.id}
-                  className="arrival-corona"
-                  aria-hidden="true"
-                />
-              )}
+            <div className={"hole-stage " + (glowing ? "arrived" : "")}>
+              {glowing && <span key={arrival?.id} className="arrival-corona" aria-hidden="true" />}
               <button
-                className={'black-hole ' + (dragging ? 'dragging' : '')}
+                className={"black-hole " + (dragging ? "dragging" : "")}
                 disabled={!!progress}
                 aria-label="Drop files here or choose files to send"
                 onClick={() => files.current?.click()}
@@ -529,30 +489,26 @@ export default function Home() {
               >
                 <span className="hole-label">
                   {glowing
-                    ? 'It arrived.'
+                    ? "It arrived."
                     : progress
-                      ? 'Sending…'
+                      ? "Sending…"
                       : dragging
-                        ? 'Let it go.'
-                        : 'Put it here.'}
+                        ? "Let it go."
+                        : "Put it here."}
                   <small>
                     {glowing
-                      ? 'Ready on the other side.'
+                      ? "Ready on the other side."
                       : progress
-                        ? 'Keep this page open.'
-                        : 'Get it there.'}
+                        ? "Keep this page open."
+                        : "Get it there."}
                   </small>
                 </span>
               </button>
             </div>
-            <div className={'transfer-tally ' + (glowing ? 'arrived' : '')}>
+            <div className={"transfer-tally " + (glowing ? "arrived" : "")}>
               <div className="tally-reading">
-                <strong
-                  aria-label={
-                    String(tally?.count ?? 0) + ' transfers since reset'
-                  }
-                >
-                  {String(tally?.count ?? 0).padStart(2, '0')}
+                <strong aria-label={String(tally?.count ?? 0) + " transfers since reset"}>
+                  {String(tally?.count ?? 0).padStart(2, "0")}
                 </strong>
                 <span>
                   Transfers
@@ -567,20 +523,18 @@ export default function Home() {
                 disabled={resetBusy || !tally?.count}
                 aria-label="Reset transfer tally without deleting files"
               >
-                {resetBusy ? 'Resetting…' : 'Reset'}
+                {resetBusy ? "Resetting…" : "Reset"}
               </Button>
             </div>
             <div
-              className={'arrival-status ' + (glowing ? 'arrived' : '')}
+              className={"arrival-status " + (glowing ? "arrived" : "")}
               role="status"
               aria-live="polite"
               aria-atomic="true"
             >
               {arrival ? (
                 <span key={arrival.id}>
-                  {arrival.count === 1
-                    ? '1 item arrived.'
-                    : arrival.count + ' items arrived.'}{' '}
+                  {arrival.count === 1 ? "1 item arrived." : arrival.count + " items arrived."}{" "}
                   Ready in the inbox.
                 </span>
               ) : (
@@ -594,7 +548,7 @@ export default function Home() {
               hidden
               onChange={(e) => {
                 void upload(Array.from(e.target.files || []));
-                e.target.value = '';
+                e.target.value = "";
               }}
             />
             <input
@@ -605,7 +559,7 @@ export default function Home() {
               hidden
               onChange={(e) => {
                 void upload(Array.from(e.target.files || []));
-                e.target.value = '';
+                e.target.value = "";
               }}
             />
             <div className="action-row">
@@ -632,35 +586,24 @@ export default function Home() {
                 <span>
                   {progress.index} / {progress.count} · {progress.name}
                 </span>
-                <progress
-                  value={progress.percent}
-                  max={100}
-                  aria-label="Upload progress"
-                />
+                <progress value={progress.percent} max={100} aria-label="Upload progress" />
                 <span>
-                  {progress.percent === 100
-                    ? 'Finishing on the PC…'
-                    : progress.percent + '%'}
+                  {progress.percent === 100 ? "Finishing on the PC…" : progress.percent + "%"}
                 </span>
-                <Button
-                  className="control"
-                  variant="ghost"
-                  onClick={() => xhrRef.current?.abort()}
-                >
+                <Button className="control" variant="ghost" onClick={() => xhrRef.current?.abort()}>
                   Cancel transfer
                 </Button>
               </div>
             ) : (
               <p className="muted transfer-hint">
-                Drag, choose, or paste · up to{' '}
-                {cap(info?.maxFile || DEFAULT_MAX_FILE)} per file
+                Drag, choose, or paste · up to {cap(info?.maxFile || DEFAULT_MAX_FILE)} per file
               </p>
             )}
           </section>
           {notice && (
             <div
-              role={notice.error ? 'alert' : 'status'}
-              className={'notice ' + (notice.error ? 'error' : '')}
+              role={notice.error ? "alert" : "status"}
+              className={"notice " + (notice.error ? "error" : "")}
             >
               {notice.text}
             </div>
@@ -676,7 +619,7 @@ export default function Home() {
                 onClick={() =>
                   void refresh().catch(() =>
                     setNotice({
-                      text: 'The PC is unreachable. Check its connection.',
+                      text: "The PC is unreachable. Check its connection.",
                       error: true,
                     }),
                   )
@@ -690,82 +633,101 @@ export default function Home() {
               <div className="empty-state">
                 Nothing in here yet.
                 <br />
-                <span className="muted">
-                  Drop something in from either device.
-                </span>
+                <span className="muted">Drop something in from either device.</span>
               </div>
             ) : (
-              <div className="items">
-                {items.map((item) => (
-                  <article className="item" key={item.id}>
-                    <a
-                      className="preview"
-                      href={'/api/items/' + item.id + '/file'}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={'Open ' + item.name}
-                    >
-                      {previewable(item.mime) ? (
-                        <img
-                          src={'/api/items/' + item.id + '/file'}
-                          alt={item.name}
-                          loading="lazy"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.parentElement?.setAttribute(
-                              'data-preview-unavailable',
-                              'true',
-                            );
-                          }}
-                        />
-                      ) : (
-                        <FileIcon size={38} />
-                      )}
-                    </a>
-                    <div className="item-body">
-                      <h3 className="filename">{item.name}</h3>
-                      <p className="item-meta">
-                        {bytes(item.size)} · {item.source} ·{' '}
-                        {new Date(item.created).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                      <div className="item-actions">
-                        <a
-                          href={'/api/items/' + item.id + '/file'}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <ArrowUpRight size={16} />
-                          Open
-                        </a>
-                        <a
-                          href={'/api/items/' + item.id + '/file?download=1'}
-                          download={item.name}
-                        >
-                          <Download size={16} />
-                          Download
-                        </a>
-                        <Button
-                          variant="ghost"
-                          className="control"
-                          aria-label={'Remove ' + item.name + ' from portal'}
-                          onClick={() => setRemoving(item)}
-                        >
-                          <Trash2 size={16} />
-                        </Button>
+              <>
+                {!info?.local && (
+                  <div className="save-guide">
+                    <strong>Getting files onto this phone</strong>
+                    <span>
+                      <b>Save to phone</b> puts a copy in{" "}
+                      {isIPhone ? "the Files app → Downloads" : "your Downloads"}.
+                    </span>
+                    {isIPhone && (
+                      <span>
+                        Photo: tap it, then press and hold the picture → Save to Photos. Video: Save
+                        to phone, then in Files tap the video → Share → Save Video.
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className="items">
+                  {items.map((item) => (
+                    <article className="item" key={item.id}>
+                      <a
+                        className="preview"
+                        href={"/api/items/" + item.id + "/file"}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={"Open " + item.name}
+                      >
+                        {previewable(item.mime) ? (
+                          <img
+                            src={"/api/items/" + item.id + "/file"}
+                            alt={item.name}
+                            loading="lazy"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              e.currentTarget.parentElement?.setAttribute(
+                                "data-preview-unavailable",
+                                "true",
+                              );
+                            }}
+                          />
+                        ) : (
+                          <FileIcon size={38} />
+                        )}
+                      </a>
+                      <div className="item-body">
+                        <h3 className="filename">{item.name}</h3>
+                        <p className="item-meta">
+                          {bytes(item.size)} · {item.source} ·{" "}
+                          {new Date(item.created).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                        <div className="item-actions">
+                          <a
+                            href={"/api/items/" + item.id + "/file"}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <ArrowUpRight size={16} />
+                            Open
+                          </a>
+                          <a
+                            href={"/api/items/" + item.id + "/file?download=1"}
+                            download={item.name}
+                            onClick={() => {
+                              if (!info?.local)
+                                setNotice({
+                                  text: isIPhone
+                                    ? "Saving " +
+                                      item.name +
+                                      ". On iPhone it goes to the Files app → Downloads."
+                                    : "Saving " + item.name + " to your Downloads.",
+                                });
+                            }}
+                          >
+                            <Download size={16} />
+                            {info?.local ? "Download" : "Save to phone"}
+                          </a>
+                          <Button
+                            variant="ghost"
+                            className="control"
+                            aria-label={"Remove " + item.name + " from portal"}
+                            onClick={() => setRemoving(item)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-            {!info?.local && (
-              <p className="save-note">
-                On iPhone: Downloads go to Files. For a photo, use Open, then
-                Safari's Share → Save Image when available.
-              </p>
+                    </article>
+                  ))}
+                </div>
+              </>
             )}
           </section>
 
@@ -787,14 +749,10 @@ export default function Home() {
                     alt="Pairing QR code"
                   />
                   <div>
-                    <p className="muted">
-                      Or open this address and enter the code:
-                    </p>
+                    <p className="muted">Or open this address and enter the code:</p>
                     <p className="pair-url">{info.address}</p>
                     <p className="pair-code">{info.pair.code}</p>
-                    <p className="muted">
-                      The code refreshes every 10 minutes.
-                    </p>
+                    <p className="muted">The code refreshes every 10 minutes.</p>
                   </div>
                 </div>
               </DialogContent>
@@ -802,8 +760,8 @@ export default function Home() {
           )}
 
           <footer>
-            {bytes(used)} of {cap(info?.maxTotal || DEFAULT_MAX_TOTAL)} ·
-            Copies stay on this PC until you remove them.
+            {bytes(used)} of {cap(info?.maxTotal || DEFAULT_MAX_TOTAL)} · Copies stay on this PC
+            until you remove them.
             <br />
             Keep the PC awake. Use ThePortal on your home Wi-Fi only.
           </footer>
@@ -819,8 +777,8 @@ export default function Home() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this portal copy?</AlertDialogTitle>
             <AlertDialogDescription>
-              {removing?.name} will disappear from both portals. Files you
-              already saved elsewhere stay untouched.
+              {removing?.name} will disappear from both portals. Files you already saved elsewhere
+              stay untouched.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -832,7 +790,7 @@ export default function Home() {
                 void remove();
               }}
             >
-              {deleteBusy ? 'Removing…' : 'Remove copy'}
+              {deleteBusy ? "Removing…" : "Remove copy"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
